@@ -1,0 +1,266 @@
+#!/usr/bin/env bash
+
+# Download this file in Windows GitBash
+#  curl -Ls https://gist.github.com/andkirby/cbeaad9fbedcbce6cf20bf5ba5467e59/raw/sscp -o /usr/bin/sscp
+
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+readonly SCRIPT_DIR
+
+show_help () {
+    echo -e "
+    UPLOAD
+    Upload file or directory onto remote server. Command:
+    $ sscp upload LOCAL_PATH REMOTE_PATH [-p PORT]
+        LOCAL_PATH  Local path to directory or file to upload onto a remote server.
+        REMOTE_PATH Remote path to directory where packed file/s should be extracted.
+        -p PORT     Define custom port.
+                    Default: 2222
+    DOWNLOAD
+    Download file or directory from remote server. Command:
+    $ sscp download REMOTE_PATH [LOCAL_PATH] [-p PORT] [-e]
+        REMOTE_PATH Remote path to directory or file to download.
+                    Be default archive of packed file/s will be placed to the user
+                    home directory.
+        LOCAL_PATH (optional)
+                    Define local path for extracting packed remote file/s.
+                    It won't unpack packed remote file/s if it's not set.
+        -p PORT     Define custom connection port.
+                    Default: 2222
+        -e          Extract downloaded file into current directory.
+    CONNECTION PARAMETERS
+    You may define connection parameters in '.sscp'.
+    It will be used from current directory where this command is being executed.
+    E.i. if you run this command from directory /var/www you may have configuration
+    file /var/www/.sscp.
+    In same time you can create it in home directory. ~/.sscp
+    File in the current directory has higher priority the in home user directory.
+    Example of .sscp:
+    connect='vagrant@127.0.0.1'
+    port='2222'
+    ssh_connect=\"ssh \${connect} -p \${port}\"
+    remote_base_dir='/var/www'
+    local_base_dir='/d/home'
+"
+}
+
+check_error () {
+    if [ $1 != 0 ]; then
+      echo -e '\e[0;31m''error''\e[0m '$2
+      exit $1
+    fi
+}
+
+read_options () {
+    while getopts "p:yhe" opt; do
+        case "$opt" in
+        h)
+            show_help
+            exit 0
+            ;;
+        \?)
+            show_help
+            exit 1
+            ;;
+        y)  dialog_yes=1
+            ;;
+        e)  extract_to_current_dir=1
+            ;;
+        p)  port=$OPTARG
+            ;;
+        esac
+    done
+}
+# Green "OK"
+t_OK='\e[0;32mOK\e[0m'
+
+read_options
+
+# Action type: upload or download or U or D
+action_type="$1"
+if [ "${action_type}" == '-h' ]; then
+  show_help
+  exit
+fi
+if [ "${action_type}" == 'U' ]; then
+  action_type='upload'
+fi
+if [ "${action_type}" == 'D' ]; then
+  action_type='download'
+fi
+if [[ ! "${action_type}" =~ ^(upload|download|test)$ ]]; then
+    check_error 3 'Action type can be "upload" or "download". Use help to get more information: sscp -h'
+fi
+shift
+
+# Argument 1
+path1="$1"
+shift
+# Argument 2
+path2=''
+if [ -n "$1" ] && [ '-' != "${1::1}" ]; then
+  path2=$1
+  shift
+fi
+
+current_pwd=$(pwd)
+
+#################################
+# Init connection configuration
+config_filename='.sscp'
+config_file=''
+if [ -f ${PWD}/${config_filename} ]; then
+    config_file="${PWD}/${config_filename}"
+elif [ -f ~/${config_filename} ]; then
+    config_file=$(cd ~; pwd)"/${config_filename}"
+fi
+connect='vagrant@127.0.0.1'
+port='2222'
+remote_base_dir=''
+local_base_dir=''
+if [ -n "${config_file}" ]; then
+    . "${config_file}"
+fi
+
+if [ -z "${ssh_connect}" ]; then
+  ssh_connect="ssh ${connect} -p ${port}"
+fi
+#################################
+
+#################################
+# Init options
+dialog_yes=0
+extract_to_current_dir=0
+read_options
+#################################
+
+if [ ${action_type} == 'test' ]; then
+    ${ssh_connect} 'ls -la / > /dev/null 2>&1'
+    check_error $?
+    echo 'OK'
+elif [ ${action_type} == 'upload' ]; then
+    # validate params
+    if [ -z "${path2}" ]; then
+        check_error 3 'Empty REMOTE_PATH argument.'
+    fi
+    if [ -z "${path1}" ]; then
+        check_error 3 'Empty LOCAL_PATH argument.'
+    fi
+    if [ "${path2::1}" == '/' ]; then
+        # absolute remote path
+        target_dir=${path2}
+    elif [ -n "${remote_base_dir}" ]; then
+        # relative remote path
+        target_dir=${remote_base_dir}/${path2}
+    else
+        # relative remote path
+        target_dir=${path2}
+    fi
+    ${ssh_connect} "ls -la ${target_dir} > /dev/null 2>&1"
+    check_error $? "Path '${target_dir}' does not exist."
+
+    if [ -f ${path1} ]; then
+        upload_type='f'
+        source_path=${path1}
+        source_dir=$(dirname ${path1})
+    elif [ -d ${path1} ]; then
+        upload_type='d'
+        source_path=${path1}
+        source_dir=${path1}
+    elif [ -n  "${local_base_dir}" ] && [ -f ${local_base_dir}/${path1} ]; then
+        upload_type='d'
+        source_path=${local_base_dir}/${path1}
+        source_dir=$(dirname ${local_base_dir}/${path1})
+    elif [ -n  "${local_base_dir}" ] && [ -d ${local_base_dir}/${path1} ]; then
+        upload_type='d'
+        source_path=${local_base_dir}/${path1}
+        source_dir=${local_base_dir}/${path1}
+    else
+        check_error 4 "error: Could not find source '${path1}'"
+    fi
+
+    if [ ${upload_type} = 'd' ] || [[ ! ${source_path} =~ .*\.tar\.gz$ ]]; then
+        printf "Packing file/s..."
+        if [ ${upload_type} = 'd' ]; then
+            tar czf $(basename ${source_path}).tar.gz -C ${source_path} .
+        else
+            tar czf $(basename ${source_path}).tar.gz ${source_path}
+        fi
+        check_error $?
+        echo -e "${t_OK}"
+
+        source_archive=$(basename ${source_path}).tar.gz
+    else
+        source_archive=$(basename ${source_path})
+    fi
+
+    printf "Uploading archive..."
+    scp -P ${port} ${source_archive} ${connect}:${target_dir} && rm -f ${source_archive}
+    check_error $?
+    echo -e "Uploading archive...${t_OK}"
+
+    printf "Unpacking archive..."
+    ${ssh_connect} "cd ${target_dir} && tar xzfm ${source_archive} && rm -f ${source_archive}"
+    check_error $?
+    echo -e "${t_OK}"
+
+elif [ ${action_type} == 'download' ]; then
+    # validate params
+    ${ssh_connect} "ls -la ${path1} > /dev/null 2>&1"
+    check_error $? "Path does '${path1}' not exist."
+    if [ -n "${path2}" ] && [ ! -d "${path2}" ]; then
+        check_error 4 "No such directory '${path2}'."
+    fi
+
+    target_type=$(${ssh_connect} "[ -d ${path1} ] && echo d || echo f")
+    check_error $?
+
+    if [ ${target_type} == 'f' ]; then
+        target_basename=$(basename "${path1}")
+        target_to_archive=''
+        download_file=${path1}
+        if [[ ! "${target_basename}" =~ \.(tar|gz) ]]; then
+            # ignore packing archives
+            target_to_archive=$(basename "${path1}")
+        fi
+        target_dir=$(dirname "${path1}")
+    else
+        target_basename=$( basename "${path1}" )
+        target_to_archive='.'
+        target_dir=${path1}
+    fi
+
+
+    if [ -n "${target_to_archive}" ]; then
+        printf "Packing file/s..."
+        download_file="~/${target_basename}.tar.gz"
+        ${ssh_connect} "tar cf ~/${target_basename}.tar.gz -C ${target_dir} ${target_to_archive}"
+        check_error $? 'Cannot make archive.'
+        echo -e "${t_OK}"
+
+    fi
+
+    printf "Downloading archive..."
+    scp -P ${port} ${connect}:${download_file} ./
+    check_error $? 'Unable to download archive.'
+    if [ -n "${target_to_archive}" ]; then
+        ${ssh_connect} "rm -rf ~/${target_basename}.tar.gz"
+        check_error $? 'Cannot remove created archive on the server.'
+    fi
+    echo -e "${t_OK}"
+
+    if [ -n "${path2}" ]; then
+        printf "Unpacking archive..."
+        tar xf ./${target_basename}.tar.gz -C ${path2}
+        check_error $?
+        echo -e "${t_OK}"
+    elif [ ${extract_to_current_dir} == 1 ]; then
+        printf "Unpacking archive into ${current_pwd}..."
+        tar xf ./${target_basename}.tar.gz -C ./
+        check_error $?
+        echo -e "${t_OK}"
+        rm -rf ./${target_basename}.tar.gz
+        check_error $?
+    else
+        echo 'Archive of target file/s: '${current_pwd}/${target_basename}.tar.gz
+    fi
+fi
