@@ -15,6 +15,7 @@ show_help () {
         REMOTE_PATH Remote path to directory where packed file/s should be extracted.
         -p PORT     Define custom port.
                     Default: 2222
+
     DOWNLOAD
     Download file or directory from remote server. Command:
     $ sscp download REMOTE_PATH [LOCAL_PATH] [-p PORT] [-e]
@@ -27,14 +28,19 @@ show_help () {
         -p PORT     Define custom connection port.
                     Default: 2222
         -e          Extract downloaded file into current directory.
+
     CONNECTION PARAMETERS
-    You may define connection parameters in '.sscp'.
+    You may define connection parameters in '.sscprc'.
+
     It will be used from current directory where this command is being executed.
     E.i. if you run this command from directory /var/www you may have configuration
-    file /var/www/.sscp.
-    In same time you can create it in home directory. ~/.sscp
+    file /var/www/.sscprc.
+
+    In the same time you can create it in home directory. ~/.sscprc
+
     File in the current directory has higher priority the in home user directory.
-    Example of .sscp:
+
+    Example of .sscprc:
     connect='vagrant@127.0.0.1'
     port='2222'
     ssh_connect=\"ssh \${connect} -p \${port}\"
@@ -106,13 +112,14 @@ current_pwd=$(pwd)
 
 #################################
 # Init connection configuration
-config_filename='.sscp'
+config_filename='.sscprc'
 config_file=''
 if [ -f ${PWD}/${config_filename} ]; then
     config_file="${PWD}/${config_filename}"
 elif [ -f ~/${config_filename} ]; then
     config_file=$(cd ~; pwd)"/${config_filename}"
 fi
+ssh_connect=''
 connect='vagrant@127.0.0.1'
 port='2222'
 remote_base_dir=''
