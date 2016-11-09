@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Download this file in Windows GitBash
-#  curl -Ls https://gist.github.com/andkirby/cbeaad9fbedcbce6cf20bf5ba5467e59/raw/sscp -o /usr/bin/sscp
+#  curl -Ls https://raw.github.com/rikby/sscp/master/sscp -o /usr/bin/sscp
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 readonly SCRIPT_DIR
