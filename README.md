@@ -28,7 +28,26 @@ Initial `~/.sscprc` file with example of the connection to Vagrant VM.
 connect='vagrant@your-host'
 port=2222
 ```
-You may add base paths:
+
+But it seems more useful will be add a SSH configuration:
+```
+$ cat ~/.ssh/config
+Host your-host yh
+  HostName your-host
+  User vagrant
+  Port 2200
+  UserKnownHostsFile /dev/null
+  StrictHostKeyChecking no
+  PasswordAuthentication no
+  IdentityFile D:/vms/my-vm/.vagrant/machines/default/virtualbox/private_key
+  IdentitiesOnly yes
+  LogLevel FATAL
+  ForwardAgent yes
+```
+
+See `vagrant ssh-config` for vagrant.
+
+Also you may add base paths:
 ```shell
 remote_base_dir='/var/www'
 local_base_dir='/d/home'
@@ -46,10 +65,6 @@ local_base_dir=''
 ssh_connect="ssh ${connect} -p ${port}"
 # SCP will use port if exists
 scp_connect="scp -P ${port}"
-# SCP will use .ssh/config if it exists
-if [ -f $(cd; pwd)/.ssh/config ]; then
-  scp_connect+=" -F $(cd; pwd)/.ssh/config"
-fi
 ```
 
 ## Using format

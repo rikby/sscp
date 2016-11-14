@@ -141,9 +141,6 @@ if [ -z "${scp_connect}" ]; then
   if [ -z "${port}" ]; then
       scp_connect+=" -P ${port}"
   fi
-  if [ -f $(cd; pwd)/.ssh/config ]; then
-      scp_connect+=" -F $(cd; pwd)/.ssh/config"
-  fi
 fi
 #################################
 
