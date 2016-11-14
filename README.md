@@ -1,7 +1,13 @@
 # sscp
-Download/upload script for remote environments.
+Download/upload whole directories to/from remote environments.
 
-In common sense it's something similar to SCP aliases.
+In common sense it's something similar to SFTP aliases.
+
+## How it works?
+It uses SSH for running commands (for pack/unpack files, etc.) and SCP for deploy/download target file/archive of files.
+
+## Why?
+The script archive whole directory and it much faster than deployment with IDE like IDEA because it performs one-by-one.
 
 # Installation
 At first, we need to download binary file
