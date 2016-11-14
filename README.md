@@ -1,6 +1,8 @@
 # sscp
 Download/upload script for remote environments.
 
+In common sense it's something similar to SCP aliases.
+
 # Installation
 At first, we need to download binary file
 ## Download bin file
@@ -8,6 +10,11 @@ At first, we need to download binary file
 $ curl -Ls https://raw.github.com/rikby/sscp/master/download | bash
 ```
 [Download extra options](doc/download.md)
+
+Now it should be ready to use.
+```shell
+$ sscp --help
+```
 
 ## Set connection parameters
 Initial `~/.sscprc` file with example of the connection to Vagrant VM.
