@@ -122,19 +122,25 @@ fi
 ssh_connect=''
 scp_connect=''
 connect='vagrant@127.0.0.1'
-port='2222'
+port=''
 remote_base_dir=''
 local_base_dir=''
 if [ -n "${config_file}" ]; then
-    . "${config_file}"
+  . "${config_file}"
 fi
 
 if [ -z "${ssh_connect}" ]; then
   ssh_connect="ssh ${connect} -p ${port}"
+  if [ -z "${port}" ]; then
+      ssh_connect+=" -P ${port}"
+  fi
 fi
 
 if [ -z "${scp_connect}" ]; then
-  scp_connect="scp -P ${port}"
+  scp_connect='scp'
+  if [ -z "${port}" ]; then
+      scp_connect+=" -P ${port}"
+  fi
   if [ -f $(cd; pwd)/.ssh/config ]; then
       scp_connect+=" -F $(cd; pwd)/.ssh/config"
   fi

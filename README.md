@@ -31,10 +31,14 @@ local_base_dir='/d/home'
 By default it has values:
 ```shell
 connect='vagrant@127.0.0.1'
-port='2222'
-ssh_connect="ssh ${connect} -p ${port}"
+port=''
+# SCP will use port if exists
+# Base directory for remote VM/server
 remote_base_dir=''
+# Base directory for for the current workstation
 local_base_dir=''
+ssh_connect="ssh ${connect} -p ${port}"
+# SCP will use port if exists
 scp_connect="scp -P ${port}"
 # SCP will use .ssh/config if it exists
 if [ -f $(cd; pwd)/.ssh/config ]; then
@@ -55,4 +59,3 @@ To get expanded help please use command:
 ```shell
 $ sscp --help
 ```
-
