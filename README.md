@@ -1,4 +1,4 @@
-# sscp
+# `sscp` Shell Tool
 Download/upload whole directories to/from remote environments.
 
 In common sense it's something similar to SFTP aliases.
