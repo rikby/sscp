@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+# Download
+#    curl -Ls https://raw.github.com/rikby/sscp/master/download | bash
+# Download particular version
+#    curl -Ls https://raw.github.com/rikby/sscp/master/download | bash -s -- --version 0.1.0
+# Download and set custom path to binary file
+#    curl -Ls https://raw.github.com/rikby/sscp/master/download | bash -s -- --file /usr/bin/sscp
+# Show available versions
+#    curl -Ls https://raw.github.com/rikby/sscp/master/download | bash -s -- --versions
+#
+# Source in master branch:
+#    https://raw.github.com/rikby/sscp/master/sscp.sh
+#
+
+set -o errexit
+set -o pipefail
+set -o nounset
+#set -o xtrace
+
+version=0.2.0
+output_file='/usr/local/bin/sscp'
+action='download'
+base_url='https://raw.github.com/rikby/sscp'
+base_api_url='https://api.github.com/repos/rikby/sscp'
+
+# validate and redefine options
+OPTS=`getopt -o lv:f: -l versions,version:,file: -- "$@"`
+eval set -- "${OPTS}"
+
+while true; do
+  case "${1}" in
+    --version|-v)
+      version="$2";
+      shift 2;
+      ;;
+    --versions|-l)
+      action='versions';
+      shift;
+      ;;
+    --file|-f)
+      output_file="$2";
+      shift 2;
+      ;;
+    --)
+      shift
+      break
+      ;;
+    *)
+      echo "${0}: unparseable option ${1}."
+      exit 3
+      ;;
+  esac
+done
+
+if [ 'versions' == "${action}" ]; then
+  curl -Ls ${base_api_url}/tags | grep '"name"' | cut -d '"' -f 4
+  exit 0
+fi
+
+no_file=0
+if [ ! -f "${output_file}" ]; then
+  no_file=1
+  touch ${output_file}
+fi
+
+echo "Fetching ${base_url}/${version}/sscp..."
+http_code=$(curl -Ls ${base_url}/${version}/sscp \
+  --fail -w '%{http_code}' --output ${output_file} || err=$?)
+
+if [ '200' != "${http_code}" ]; then
+  echo "error: [${http_code}] No such version or bad connection."
+  if [ ${no_file} == 1 ]; then
+    rm -rf ${output_file}
+  fi
+  exit 8
+fi
+
+if [[ ! "$(uname -a)" =~ 'Msys' ]]; then
+  chmod +x ${output_file}
+fi
+echo 'SCP wrapper: '${output_file}

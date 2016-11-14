@@ -120,6 +120,7 @@ elif [ -f ~/${config_filename} ]; then
     config_file=$(cd ~; pwd)"/${config_filename}"
 fi
 ssh_connect=''
+scp_connect=''
 connect='vagrant@127.0.0.1'
 port='2222'
 remote_base_dir=''
@@ -130,6 +131,13 @@ fi
 
 if [ -z "${ssh_connect}" ]; then
   ssh_connect="ssh ${connect} -p ${port}"
+fi
+
+if [ -z "${scp_connect}" ]; then
+  scp_connect="scp -P ${port}"
+  if [ -f $(cd; pwd)/.ssh/config ]; then
+      scp_connect+=" -F $(cd; pwd)/.ssh/config"
+  fi
 fi
 #################################
 
@@ -201,7 +209,7 @@ elif [ ${action_type} == 'upload' ]; then
     fi
 
     printf "Uploading archive..."
-    scp -P ${port} ${source_archive} ${connect}:${target_dir} && rm -f ${source_archive}
+    ${scp_connect} ${source_archive} ${connect}:${target_dir} && rm -f ${source_archive}
     check_error $?
     echo -e "Uploading archive...${t_OK}"
 
@@ -247,7 +255,7 @@ elif [ ${action_type} == 'download' ]; then
     fi
 
     printf "Downloading archive..."
-    scp -P ${port} ${connect}:${download_file} ./
+    ${scp_connect} ${connect}:${download_file} ./
     check_error $? 'Unable to download archive.'
     if [ -n "${target_to_archive}" ]; then
         ${ssh_connect} "rm -rf ~/${target_basename}.tar.gz"
