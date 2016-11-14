@@ -29,6 +29,7 @@ connect='vagrant@your-host'
 port=2222
 ```
 
+### With SSH config
 But it seems more useful will be add a SSH configuration:
 ```
 $ cat ~/.ssh/config
@@ -44,26 +45,30 @@ Host your-host yh
   LogLevel FATAL
   ForwardAgent yes
 ```
+And define your connection only:
+```shell
+connect='vagrant@your-host'
+```
 
 See `vagrant ssh-config` for vagrant.
 
+### Base paths
 Also you may add base paths:
 ```shell
 remote_base_dir='/var/www'
 local_base_dir='/d/home'
 ```
-
+### Default values
 By default it has values:
 ```shell
 connect='vagrant@127.0.0.1'
 port=''
-# SCP will use port if exists
 # Base directory for remote VM/server
 remote_base_dir=''
 # Base directory for for the current workstation
 local_base_dir=''
+# It will use port if exists
 ssh_connect="ssh ${connect} -p ${port}"
-# SCP will use port if exists
 scp_connect="scp -P ${port}"
 ```
 
