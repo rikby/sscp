@@ -131,14 +131,14 @@ fi
 
 if [ -z "${ssh_connect}" ]; then
   ssh_connect="ssh ${connect} -p ${port}"
-  if [ -z "${port}" ]; then
+  if [ -n "${port}" ]; then
       ssh_connect+=" -P ${port}"
   fi
 fi
 
 if [ -z "${scp_connect}" ]; then
   scp_connect='scp'
-  if [ -z "${port}" ]; then
+  if [ -n "${port}" ]; then
       scp_connect+=" -P ${port}"
   fi
 fi
@@ -281,4 +281,4 @@ elif [ ${action_type} == 'download' ]; then
     else
         echo 'Archive of target file/s: '${current_pwd}/${target_basename}.tar.gz
     fi
-fi
+fi 
