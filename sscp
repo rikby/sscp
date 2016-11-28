@@ -130,7 +130,7 @@ if [ -n "${config_file}" ]; then
 fi
 
 if [ -z "${ssh_connect}" ]; then
-  ssh_connect="ssh ${connect} -p ${port}"
+  ssh_connect="ssh ${connect}"
   if [ -n "${port}" ]; then
       ssh_connect+=" -P ${port}"
   fi
