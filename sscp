@@ -150,13 +150,15 @@ read_params () {
 }
 
 define_exclude_options() {
-  exclude=''
+  local exclude=''
+  local path=$1
   if [ 1 == ${exclude_on} ]; then
     exclude='--exclude='${SSCP_EXCLUDE}
     if [ 0 == ${use_vcs} ] && [[ ! "${path1}" =~ \.git[^/]*$ ]]; then
       exclude+=' --exclude-vcs'
     fi
   fi
+  echo ${exclude}
 }
 
 # Init connection configuration
@@ -328,7 +330,7 @@ process_deployment() {
   read_params $@
 
   current_pwd=$(pwd)
-  exclude=$(define_exclude_options)
+  exclude=$(define_exclude_options ${path1})
 
   init_connection
 
