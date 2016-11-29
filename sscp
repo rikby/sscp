@@ -19,51 +19,67 @@ readonly __dir __file
 
 show_help () {
     cat << 'EOF'
-    UPLOAD
-    Upload file or directory onto remote server. Command:
-    $ sscp upload LOCAL_PATH REMOTE_PATH [-p PORT]
-        LOCAL_PATH  Local path to directory or file to upload onto a remote server.
-        REMOTE_PATH Remote path to directory where packed file/s should be extracted.
-        -p PORT     Define custom port.
-                    Default: 2222
+SSCP 0.3.0
+Fast downloader/deployer for remote servers.
+It archives files by using tar and transporting them using by SCP.
+Commands run by using SSH connection.
 
-    DOWNLOAD
-    Download file or directory from remote server. Command:
-    $ sscp download REMOTE_PATH [LOCAL_PATH] [-p PORT] [-e]
-        REMOTE_PATH Remote path to directory or file to download.
-                    Be default archive of packed file/s will be placed to the user
-                    home directory.
-        LOCAL_PATH (optional)
-                    Define local path for extracting packed remote file/s.
-                    It won't unpack packed remote file/s if it's not set.
-        -p|--port PORT
-                    Define custom connection port.
-                    Default: 2222
-        -g|--use-vcs
-                    Include VCS file into transition archives.
-                    It excludes .idea files and VCS. This option will disable
-                    excluding VCS files.
-        -e|--ignore-excluding
-                    Ignore all default excluding.
-        -h|--help   Show this help
+$ sscp upload|U|download|D SOURCE_PATH TARGET_PATH \
+  [-p PORT] [-e|--ignore-excluding] [--use-vcs] [-- tar options]
+    LOCAL_PATH  Local path to directory or file to upload onto a remote server.
+    REMOTE_PATH Remote path to directory where packed file/s should be extracted.
 
-    CONNECTION PARAMETERS
-    You may define connection parameters in '.sscprc'.
+UPLOAD
+Upload file or directory onto remote server. Command:
+  SOURCE_PATH Local path to directory or file to upload. Be default archive
+              of packed file/s will be placed to the user home directory.
+  TARGET_PATH Define remote path for extracting packed remote file/s.
+              It won't unpack packed remote file/s if it's not set.
 
-    It will be used from current directory where this command is being executed.
-    E.i. if you run this command from directory /var/www you may have configuration
-    file /var/www/.sscprc.
+DOWNLOAD
+Download file or directory from remote server. Command:
+  SOURCE_PATH Remote path to directory or file to download. Be default archive
+              of packed file/s will be placed to the user home directory.
+  TARGET_PATH Optional.
+              Define local path for extracting packed remote file/s.
+              It won't unpack packed remote file/s if it's not set.
+              If this argument is omitted made archive will be placed into
+              a current directory.
 
-    In the same time you can create it in home directory. ~/.sscprc
+OPTIONS
+  -p|--port PORT
+              Define custom connection port.
+              Default: 2222
+  -g|--use-vcs
+              Include VCS file into transition archives.
+              It excludes .idea files and VCS. This option will disable
+              excluding VCS files.
+  -H|--host HOST
+              Connection host. It can be passed with a username.
+              root@example.com
+  -e|--ignore-excluding
+              Ignore all default excluding.
+  -h|--help   Show this help
 
-    File in the current directory has higher priority the in home user directory.
+CONNECTION PARAMETERS
+You may define connection parameters in '.sscprc'.
 
-    Example of .sscprc:
-    connect='vagrant@127.0.0.1'
-    port='2222'
-    ssh_connect="ssh ${connect} -p ${port}"
-    remote_base_dir='/var/www'
-    local_base_dir='/d/home'
+It will be used from current directory where this command is being executed.
+E.i. if you run this command from directory /var/www you may have configuration
+file /var/www/.sscprc.
+
+In the same time you can create it in home directory. ~/.sscprc
+
+File in the current directory has higher priority the in home user directory.
+
+Example of .sscprc:
+connect='vagrant@127.0.0.1'
+port='2222'
+ssh_connect="ssh ${connect} -p ${port}"
+remote_base_dir='/var/www'
+local_base_dir='/d/home'
+
+Anyway, you may declare .ssh/config file.
 EOF
 }
 
@@ -72,12 +88,14 @@ SSCP_BASE_DIR=${SSCP_BASE_DIR:-$(cd; pwd)}
 SSCP_SSH_BIN=${SSCP_SSH_BIN:-ssh}
 SSCP_SCP_BIN=${SSCP_SCP_BIN:-scp}
 SSCP_EXCLUDE=${SSCP_EXCLUDE:-.idea}
+SSCP_CONNECT=${SSCP_CONNECT:-vagrant@127.0.0.1}
+SSCP_TEMP=${SSCP_TEMP:-$(cd; pwd)}
 
 check_error () {
-    if [ $1 != 0 ]; then
-      echo -e '\e[0;31m''error''\e[0m '$2
-      exit $1
-    fi
+  if [ $1 != 0 ]; then
+    echo -e '\e[0;31m''error''\e[0m '$2
+    exit $1
+  fi
 }
 
 read_params () {
@@ -95,7 +113,7 @@ read_params () {
     action_type='download'
   fi
   if [[ ! "${action_type}" =~ ^(upload|download|test)$ ]]; then
-      check_error 3 'Action type can be "upload" or "download". Use help to get more information: sscp -h'
+    check_error 3 'Action type can be "upload" or "download". Use help to get more information: sscp -h'
   fi
   shift
 
@@ -127,6 +145,10 @@ read_params () {
         ;;
       -p|--port)
         port="$2"
+        shift 2
+        ;;
+      -H|--host)
+        connect="$2"
         shift 2
         ;;
       -h|--help)
@@ -174,7 +196,7 @@ init_connection() {
   fi
   ssh_connect=''
   scp_connect=''
-  connect='vagrant@127.0.0.1'
+  connect=${connect:-${SSCP_CONNECT}}
   port=''
   remote_base_dir=''
   local_base_dir=''
@@ -206,57 +228,57 @@ test_connection() {
 deploy_target() {
   # validate params
   if [ -z "${path2}" ]; then
-      check_error 3 'Empty REMOTE_PATH argument.'
+    check_error 3 'Empty REMOTE_PATH argument.'
   fi
   if [ -z "${path1}" ]; then
-      check_error 3 'Empty LOCAL_PATH argument.'
+    check_error 3 'Empty LOCAL_PATH argument.'
   fi
   if [ "${path2::1}" == '/' ]; then
-      # absolute remote path
-      target_dir=${path2}
+    # absolute remote path
+    target_dir=${path2}
   elif [ -n "${remote_base_dir}" ]; then
-      # relative remote path
-      target_dir=${remote_base_dir}/${path2}
+    # relative remote path
+    target_dir=${remote_base_dir}/${path2}
   else
-      # relative remote path
-      target_dir=${path2}
+    # relative remote path
+    target_dir=${path2}
   fi
   ${ssh_connect} "ls -la ${target_dir} > /dev/null 2>&1"
   check_error $? "Path '${target_dir}' does not exist."
 
   if [ -f ${path1} ]; then
-      upload_type='f'
-      source_path=${path1}
-      source_dir=$(dirname ${path1})
+    upload_type='f'
+    source_path=${path1}
+    source_dir=$(dirname ${path1})
   elif [ -d ${path1} ]; then
-      upload_type='d'
-      source_path=${path1}
-      source_dir=${path1}
+    upload_type='d'
+    source_path=${path1}
+    source_dir=${path1}
   elif [ -n  "${local_base_dir}" ] && [ -f ${local_base_dir}/${path1} ]; then
-      upload_type='d'
-      source_path=${local_base_dir}/${path1}
-      source_dir=$(dirname ${local_base_dir}/${path1})
+    upload_type='d'
+    source_path=${local_base_dir}/${path1}
+    source_dir=$(dirname ${local_base_dir}/${path1})
   elif [ -n  "${local_base_dir}" ] && [ -d ${local_base_dir}/${path1} ]; then
-      upload_type='d'
-      source_path=${local_base_dir}/${path1}
-      source_dir=${local_base_dir}/${path1}
+    upload_type='d'
+    source_path=${local_base_dir}/${path1}
+    source_dir=${local_base_dir}/${path1}
   else
-      check_error 4 "error: Could not find source '${path1}'"
+    check_error 4 "error: Could not find source '${path1}'"
   fi
 
   if [ ${upload_type} = 'd' ] || [[ ! ${source_path} =~ .*\.tar\.gz$ ]]; then
-      printf "Packing file/s..."
-      if [ ${upload_type} = 'd' ]; then
-          tar czf $(basename ${source_path}).tar.gz -C ${source_path} . ${exclude} ${tar_options}
-      else
-          tar czf $(basename ${source_path}).tar.gz ${source_path} ${exclude} ${tar_options}
-      fi
-      check_error $?
-      echo -e "${t_OK}"
+    printf "Packing file/s..."
+    if [ ${upload_type} = 'd' ]; then
+        tar czf $(basename ${source_path}).tar.gz -C ${source_path} . ${exclude} ${tar_options}
+    else
+        tar czf $(basename ${source_path}).tar.gz ${source_path} ${exclude} ${tar_options}
+    fi
+    check_error $?
+    echo -e "${t_OK}"
 
-      source_archive=$(basename ${source_path}).tar.gz
+    source_archive=$(basename ${source_path}).tar.gz
   else
-      source_archive=$(basename ${source_path})
+    source_archive=$(basename ${source_path})
   fi
 
   printf "Uploading archive..."
@@ -275,52 +297,52 @@ download_target() {
   ${ssh_connect} "ls -la ${path1} > /dev/null 2>&1"
   check_error $? "Path does '${path1}' not exist."
   if [ -n "${path2}" ] && [ ! -d "${path2}" ]; then
-      check_error 4 "No such directory '${path2}'."
+    check_error 4 "No such directory '${path2}'."
   fi
 
   target_type=$(${ssh_connect} "[ -d ${path1} ] && echo d || echo f")
   check_error $?
 
   if [ ${target_type} == 'f' ]; then
-      target_basename=$(basename "${path1}")
-      target_to_archive=''
-      download_file=${path1}
-      if [[ ! "${target_basename}" =~ \.(tar|gz) ]]; then
-          # ignore packing archives
-          target_to_archive=$(basename "${path1}")
-      fi
-      target_dir=$(dirname "${path1}")
+    target_basename=$(basename "${path1}")
+    target_to_archive=''
+    download_file=${path1}
+    if [[ ! "${target_basename}" =~ \.(tar|gz) ]]; then
+        # ignore packing archives
+        target_to_archive=$(basename "${path1}")
+    fi
+    target_dir=$(dirname "${path1}")
   else
-      target_basename=$( basename "${path1}" )
-      target_to_archive='.'
-      target_dir=${path1}
+    target_basename=$( basename "${path1}" )
+    target_to_archive='.'
+    target_dir=${path1}
   fi
 
 
   if [ -n "${target_to_archive}" ]; then
-      printf "Packing file/s..."
-      download_file="~/${target_basename}.tar.gz"
-      ${ssh_connect} "tar cf ~/${target_basename}.tar.gz -C ${target_dir} ${target_to_archive} ${exclude} ${tar_options}"
-      check_error $? 'Cannot make archive.'
-      echo -e "${t_OK}"
+    printf "Packing file/s..."
+    download_file="${SSCP_TEMP}/${target_basename}.tar.gz"
+    ${ssh_connect} "tar cf ${SSCP_TEMP}/${target_basename}.tar.gz -C ${target_dir} ${target_to_archive} ${exclude} ${tar_options}"
+    check_error $? 'Cannot make archive.'
+    echo -e "${t_OK}"
   fi
 
   printf "Downloading archive..."
   ${scp_connect} ${connect}:${download_file} ./
   check_error $? 'Unable to download archive.'
   if [ -n "${target_to_archive}" ]; then
-      ${ssh_connect} "rm -rf ~/${target_basename}.tar.gz"
-      check_error $? 'Cannot remove created archive on the server.'
+    ${ssh_connect} "rm -rf ${SSCP_TEMP}/${target_basename}.tar.gz"
+    check_error $? 'Cannot remove created archive on the server.'
   fi
   echo -e "${t_OK}"
 
   if [ -n "${path2}" ]; then
-      printf "Unpacking archive..."
-      tar xf ./${target_basename}.tar.gz -C ${path2}
-      check_error $?
-      echo -e "${t_OK}"
+    printf "Unpacking archive..."
+    tar xf ./${target_basename}.tar.gz -C ${path2}
+    check_error $?
+    echo -e "${t_OK}"
   else
-      echo 'Archive of target file/s: './${target_basename}.tar.gz
+    echo 'Archive of target file/s: './${target_basename}.tar.gz
   fi
 }
 
