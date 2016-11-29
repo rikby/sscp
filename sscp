@@ -2,12 +2,17 @@
 
 # Download this file in Windows GitBash
 #  curl -Ls https://raw.github.com/rikby/sscp/master/sscp -o /usr/bin/sscp
+# Global vars:
+#   SSCP_RC=.sscprc    - global resource file
+#   SSCP_SSH_BIN=ssh   - SSH bin file
+#   SSCP_SCP_BIN=scp   - SCP bin file
+#   SSCP_EXCLUDE=.idea - Custom exclude list.
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 readonly SCRIPT_DIR
 
 show_help () {
-    echo -e "
+    cat << 'EOF'
     UPLOAD
     Upload file or directory onto remote server. Command:
     $ sscp upload LOCAL_PATH REMOTE_PATH [-p PORT]
@@ -25,9 +30,16 @@ show_help () {
         LOCAL_PATH (optional)
                     Define local path for extracting packed remote file/s.
                     It won't unpack packed remote file/s if it's not set.
-        -p PORT     Define custom connection port.
+        -p|--port PORT
+                    Define custom connection port.
                     Default: 2222
-        -e          Extract downloaded file into current directory.
+        -g|--use-vcs
+                    Include VCS file into transition archives.
+                    It excludes .idea files and VCS. This option will disable
+                    excluding VCS files.
+        -e|--ignore-excluding
+                    Ignore all default excluding.
+        -h|--help   Show this help
 
     CONNECTION PARAMETERS
     You may define connection parameters in '.sscprc'.
@@ -43,10 +55,10 @@ show_help () {
     Example of .sscprc:
     connect='vagrant@127.0.0.1'
     port='2222'
-    ssh_connect=\"ssh \${connect} -p \${port}\"
+    ssh_connect="ssh ${connect} -p ${port}"
     remote_base_dir='/var/www'
     local_base_dir='/d/home'
-"
+EOF
 }
 
 check_error () {
@@ -57,24 +69,43 @@ check_error () {
 }
 
 read_options () {
-    while getopts "p:yhe" opt; do
-        case "$opt" in
-        h)
-            show_help
-            exit 0
-            ;;
-        \?)
-            show_help
-            exit 1
-            ;;
-        y)  dialog_yes=1
-            ;;
-        e)  extract_to_current_dir=1
-            ;;
-        p)  port=$OPTARG
-            ;;
-        esac
-    done
+  # validate and redefine options
+  OPTS=`getopt -o gp:h -l use-vcs,port:,help -- "$@"`
+  eval set -- "${OPTS}"
+  use_vcs=0
+  exclude_on=1
+  while true; do
+    case "${1}" in
+      -g|--use-vcs)
+        use_vcs=1
+        shift
+        ;;
+      -e|--ignore-excluding)
+        exclude_on=0
+        shift
+        ;;
+      -p|--port)
+        port="$2"
+        shift 2
+        ;;
+      -h|--help)
+        show_help
+        exit 0
+        ;;
+      -\?)
+        show_help
+        exit 1
+        ;;
+      --)
+        shift
+        break
+        ;;
+      *)
+        echo "${0}: unparseable option ${1}."
+        exit 3
+        ;;
+    esac
+  done
 }
 # Green "OK"
 t_OK='\e[0;32mOK\e[0m'
@@ -108,16 +139,24 @@ if [ -n "$1" ] && [ '-' != "${1::1}" ]; then
   shift
 fi
 
+exclude=''
+if [ 1 == ${exclude_on} ]; then
+  exclude='--exclude='${SSCP_EXCLUDE:-.idea}
+  if [ 0 == ${use_vcs} ] && [[ ! "${path1}" =~ \.git[^/]*$ ]]; then
+    exclude+=' --exclude-vcs'
+  fi
+fi
+
 current_pwd=$(pwd)
 
 #################################
 # Init connection configuration
-config_filename='.sscprc'
+config_filename=${SSCP_RC:-.sscprc}
 config_file=''
 if [ -f ${PWD}/${config_filename} ]; then
-    config_file="${PWD}/${config_filename}"
+  config_file="${PWD}/${config_filename}"
 elif [ -f ~/${config_filename} ]; then
-    config_file=$(cd ~; pwd)"/${config_filename}"
+  config_file=$(cd ~; pwd)"/${config_filename}"
 fi
 ssh_connect=''
 scp_connect=''
@@ -130,24 +169,22 @@ if [ -n "${config_file}" ]; then
 fi
 
 if [ -z "${ssh_connect}" ]; then
-  ssh_connect="ssh ${connect}"
+  ssh_connect="${SSCP_SSH_BIN:-ssh} ${connect}"
   if [ -n "${port}" ]; then
       ssh_connect+=" -P ${port}"
   fi
 fi
 
 if [ -z "${scp_connect}" ]; then
-  scp_connect='scp'
+  scp_connect=${SSCP_SCP_BIN:-scp}
   if [ -n "${port}" ]; then
-      scp_connect+=" -P ${port}"
+    scp_connect+=" -P ${port}"
   fi
 fi
 #################################
 
 #################################
 # Init options
-dialog_yes=0
-extract_to_current_dir=0
 read_options
 #################################
 
@@ -199,9 +236,9 @@ elif [ ${action_type} == 'upload' ]; then
     if [ ${upload_type} = 'd' ] || [[ ! ${source_path} =~ .*\.tar\.gz$ ]]; then
         printf "Packing file/s..."
         if [ ${upload_type} = 'd' ]; then
-            tar czf $(basename ${source_path}).tar.gz -C ${source_path} .
+            tar czf $(basename ${source_path}).tar.gz -C ${source_path} . ${exclude}
         else
-            tar czf $(basename ${source_path}).tar.gz ${source_path}
+            tar czf $(basename ${source_path}).tar.gz ${source_path} ${exclude}
         fi
         check_error $?
         echo -e "${t_OK}"
@@ -251,7 +288,7 @@ elif [ ${action_type} == 'download' ]; then
     if [ -n "${target_to_archive}" ]; then
         printf "Packing file/s..."
         download_file="~/${target_basename}.tar.gz"
-        ${ssh_connect} "tar cf ~/${target_basename}.tar.gz -C ${target_dir} ${target_to_archive}"
+        ${ssh_connect} "tar cf ~/${target_basename}.tar.gz -C ${target_dir} ${target_to_archive} ${exclude}"
         check_error $? 'Cannot make archive.'
         echo -e "${t_OK}"
 
@@ -271,14 +308,7 @@ elif [ ${action_type} == 'download' ]; then
         tar xf ./${target_basename}.tar.gz -C ${path2}
         check_error $?
         echo -e "${t_OK}"
-    elif [ ${extract_to_current_dir} == 1 ]; then
-        printf "Unpacking archive into ${current_pwd}..."
-        tar xf ./${target_basename}.tar.gz -C ./
-        check_error $?
-        echo -e "${t_OK}"
-        rm -rf ./${target_basename}.tar.gz
-        check_error $?
     else
         echo 'Archive of target file/s: '${current_pwd}/${target_basename}.tar.gz
     fi
-fi 
+fi
