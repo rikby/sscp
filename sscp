@@ -105,7 +105,7 @@ read_params () {
   # Process args
   # Action type: upload or download or U or D
   action_type="${1:-}"
-  if [ "${action_type}" == '-h' ]; then
+  if [ "${action_type}" == '-h' ] || [ "${action_type}" == '--help' ]; then
     show_help
     exit
   fi
