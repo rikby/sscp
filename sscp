@@ -3,10 +3,13 @@
 # Download this file in Windows GitBash
 #  curl -Ls https://raw.github.com/rikby/sscp/master/sscp -o /usr/bin/sscp
 # Global vars:
-#   SSCP_RC=.sscprc    - global resource file
-#   SSCP_SSH_BIN=ssh   - SSH bin file
-#   SSCP_SCP_BIN=scp   - SCP bin file
-#   SSCP_EXCLUDE=.idea - Custom exclude list.
+#   SSCP_RC=.sscprc     - Global resource file
+#   SSCP_SSH_BIN=ssh    - SSH bin file
+#   SSCP_SCP_BIN=scp    - SCP bin file
+#   SSCP_EXCLUDE=.idea  - Custom exclude list.
+#   SSCP_TEMP=~         - Temp directory for archive. It uses for remote servers.
+#   SSCP_CONNECT=.vagrant@127.0.0.1
+#                       - Connection host and user.
 
 set -o pipefail
 set -o errexit
@@ -16,6 +19,14 @@ set -o nounset
 __dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 __file="${__dir}/$(basename "${BASH_SOURCE[0]}")"
 readonly __dir __file
+
+SSCP_RC=${SSCP_RC:-.sscprc}
+SSCP_BASE_DIR=${SSCP_BASE_DIR:-$(cd; pwd)}
+SSCP_SSH_BIN=${SSCP_SSH_BIN:-ssh}
+SSCP_SCP_BIN=${SSCP_SCP_BIN:-scp}
+SSCP_EXCLUDE=${SSCP_EXCLUDE:-.idea}
+SSCP_CONNECT=${SSCP_CONNECT:-vagrant@127.0.0.1}
+SSCP_TEMP=${SSCP_TEMP:-'~'}
 
 show_help () {
     cat << 'EOF'
@@ -82,14 +93,6 @@ local_base_dir='/d/home'
 Anyway, you may declare .ssh/config file.
 EOF
 }
-
-SSCP_RC=${SSCP_RC:-.sscprc}
-SSCP_BASE_DIR=${SSCP_BASE_DIR:-$(cd; pwd)}
-SSCP_SSH_BIN=${SSCP_SSH_BIN:-ssh}
-SSCP_SCP_BIN=${SSCP_SCP_BIN:-scp}
-SSCP_EXCLUDE=${SSCP_EXCLUDE:-.idea}
-SSCP_CONNECT=${SSCP_CONNECT:-vagrant@127.0.0.1}
-SSCP_TEMP=${SSCP_TEMP:-'~'}
 
 check_error () {
   if [ $1 != 0 ]; then
