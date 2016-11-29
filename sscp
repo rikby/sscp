@@ -32,7 +32,7 @@ show_help () {
     cat << 'EOF'
 SSCP Shell Tool v0.3.0
 Fast downloader/deployer for remote servers.
-It archives files by using tar and transporting them using by SCP.
+It archives files by using tar and transports them using by SCP.
 Commands run by using SSH connection.
 
 $ sscp upload|U|download|D SOURCE_PATH TARGET_PATH \
