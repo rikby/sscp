@@ -23,10 +23,11 @@ $ sscp --help
 ```
 
 ## Set connection parameters
+(Example with vagrant connection.)
+
 Initial `~/.sscprc` file with example of the connection to Vagrant VM.
 ```shell
-connect='vagrant@your-host'
-port=2222
+connect='your-host'
 ```
 
 ### With SSH config
@@ -79,7 +80,7 @@ $ sscp upload LOCAL_PATH REMOTE_PATH [-p PORT]
 ```
 To **download** folder it has format
 ```shell
-$ sscp download REMOTE_PATH [LOCAL_PATH] [-p PORT] [-e]
+$ sscp download REMOTE_PATH [LOCAL_PATH] [-p PORT]
 ```
 To get expanded help please use command:
 ```shell

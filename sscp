@@ -30,7 +30,7 @@ SSCP_TEMP=${SSCP_TEMP:-'~'}
 
 show_help () {
     cat << 'EOF'
-SSCP 0.3.0
+SSCP Shell Tool v0.3.0
 Fast downloader/deployer for remote servers.
 It archives files by using tar and transporting them using by SCP.
 Commands run by using SSH connection.
