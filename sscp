@@ -83,7 +83,7 @@ check_error () {
 read_params () {
   # Process args
   # Action type: upload or download or U or D
-  action_type="$1"
+  action_type="${1:-}"
   if [ "${action_type}" == '-h' ]; then
     show_help
     exit
@@ -104,7 +104,7 @@ read_params () {
   shift
   # Argument 2
   path2=''
-  if [ -n "$1" ] && [ '-' != "${1::1}" ]; then
+  if [ -n "${1:-}" ] && [ '-' != "${1::1}" ]; then
     path2=$1
     shift
   fi
@@ -329,6 +329,8 @@ process_deployment() {
 
   current_pwd=$(pwd)
   exclude=$(define_exclude_options)
+
+  init_connection
 
   if [ ${action_type} == 'test' ]; then
     test_connection
