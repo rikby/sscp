@@ -8,8 +8,14 @@
 #   SSCP_SCP_BIN=scp   - SCP bin file
 #   SSCP_EXCLUDE=.idea - Custom exclude list.
 
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-readonly SCRIPT_DIR
+set -o pipefail
+set -o errexit
+set -o nounset
+#set -o xtrace
+
+__dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+__file="${__dir}/$(basename "${BASH_SOURCE[0]}")"
+readonly __dir __file
 
 show_help () {
     cat << 'EOF'
@@ -61,6 +67,12 @@ show_help () {
 EOF
 }
 
+SSCP_RC=${SSCP_RC:-.sscprc}
+SSCP_BASE_DIR=${SSCP_BASE_DIR:-$(cd; pwd)}
+SSCP_SSH_BIN=${SSCP_SSH_BIN:-ssh}
+SSCP_SCP_BIN=${SSCP_SCP_BIN:-scp}
+SSCP_EXCLUDE=${SSCP_EXCLUDE:-.idea}
+
 check_error () {
     if [ $1 != 0 ]; then
       echo -e '\e[0;31m''error''\e[0m '$2
@@ -68,7 +80,36 @@ check_error () {
     fi
 }
 
-read_options () {
+read_params () {
+  # Process args
+  # Action type: upload or download or U or D
+  action_type="$1"
+  if [ "${action_type}" == '-h' ]; then
+    show_help
+    exit
+  fi
+  if [ "${action_type}" == 'U' ]; then
+    action_type='upload'
+  fi
+  if [ "${action_type}" == 'D' ]; then
+    action_type='download'
+  fi
+  if [[ ! "${action_type}" =~ ^(upload|download|test)$ ]]; then
+      check_error 3 'Action type can be "upload" or "download". Use help to get more information: sscp -h'
+  fi
+  shift
+
+  # Argument 1
+  path1="$1"
+  shift
+  # Argument 2
+  path2=''
+  if [ -n "$1" ] && [ '-' != "${1::1}" ]; then
+    path2=$1
+    shift
+  fi
+
+  # Process options
   # validate and redefine options
   OPTS=`getopt -o gp:h -l use-vcs,port:,help -- "$@"`
   eval set -- "${OPTS}"
@@ -107,208 +148,195 @@ read_options () {
     esac
   done
 }
-# Green "OK"
-t_OK='\e[0;32mOK\e[0m'
 
-read_options
-
-# Action type: upload or download or U or D
-action_type="$1"
-if [ "${action_type}" == '-h' ]; then
-  show_help
-  exit
-fi
-if [ "${action_type}" == 'U' ]; then
-  action_type='upload'
-fi
-if [ "${action_type}" == 'D' ]; then
-  action_type='download'
-fi
-if [[ ! "${action_type}" =~ ^(upload|download|test)$ ]]; then
-    check_error 3 'Action type can be "upload" or "download". Use help to get more information: sscp -h'
-fi
-shift
-
-# Argument 1
-path1="$1"
-shift
-# Argument 2
-path2=''
-if [ -n "$1" ] && [ '-' != "${1::1}" ]; then
-  path2=$1
-  shift
-fi
-
-exclude=''
-if [ 1 == ${exclude_on} ]; then
-  exclude='--exclude='${SSCP_EXCLUDE:-.idea}
-  if [ 0 == ${use_vcs} ] && [[ ! "${path1}" =~ \.git[^/]*$ ]]; then
-    exclude+=' --exclude-vcs'
+define_exclude_options() {
+  exclude=''
+  if [ 1 == ${exclude_on} ]; then
+    exclude='--exclude='${SSCP_EXCLUDE}
+    if [ 0 == ${use_vcs} ] && [[ ! "${path1}" =~ \.git[^/]*$ ]]; then
+      exclude+=' --exclude-vcs'
+    fi
   fi
-fi
+}
 
-current_pwd=$(pwd)
-
-#################################
 # Init connection configuration
-config_filename=${SSCP_RC:-.sscprc}
-config_file=''
-if [ -f ${PWD}/${config_filename} ]; then
-  config_file="${PWD}/${config_filename}"
-elif [ -f ~/${config_filename} ]; then
-  config_file=$(cd ~; pwd)"/${config_filename}"
-fi
-ssh_connect=''
-scp_connect=''
-connect='vagrant@127.0.0.1'
-port=''
-remote_base_dir=''
-local_base_dir=''
-if [ -n "${config_file}" ]; then
-  . "${config_file}"
-fi
-
-if [ -z "${ssh_connect}" ]; then
-  ssh_connect="${SSCP_SSH_BIN:-ssh} ${connect}"
-  if [ -n "${port}" ]; then
-      ssh_connect+=" -P ${port}"
+init_connection() {
+  config_filename=${SSCP_RC}
+  config_file=''
+  if [ -f ${PWD}/${config_filename} ]; then
+    config_file="${PWD}/${config_filename}"
+  elif [ -f ${SSCP_BASE_DIR}/${config_filename} ]; then
+    config_file=${SSCP_BASE_DIR}"/${config_filename}"
   fi
-fi
-
-if [ -z "${scp_connect}" ]; then
-  scp_connect=${SSCP_SCP_BIN:-scp}
-  if [ -n "${port}" ]; then
-    scp_connect+=" -P ${port}"
+  ssh_connect=''
+  scp_connect=''
+  connect='vagrant@127.0.0.1'
+  port=''
+  remote_base_dir=''
+  local_base_dir=''
+  if [ -n "${config_file}" ]; then
+    . "${config_file}"
   fi
-fi
-#################################
 
-#################################
-# Init options
-read_options
-#################################
-
-if [ ${action_type} == 'test' ]; then
-    ${ssh_connect} 'ls -la / > /dev/null 2>&1'
-    check_error $?
-    echo 'OK'
-elif [ ${action_type} == 'upload' ]; then
-    # validate params
-    if [ -z "${path2}" ]; then
-        check_error 3 'Empty REMOTE_PATH argument.'
+  if [ -z "${ssh_connect}" ]; then
+    ssh_connect="${SSCP_SSH_BIN} ${connect}"
+    if [ -n "${port}" ]; then
+        ssh_connect+=" -P ${port}"
     fi
-    if [ -z "${path1}" ]; then
-        check_error 3 'Empty LOCAL_PATH argument.'
+  fi
+
+  if [ -z "${scp_connect}" ]; then
+    scp_connect=${SSCP_SCP_BIN}
+    if [ -n "${port}" ]; then
+      scp_connect+=" -P ${port}"
     fi
-    if [ "${path2::1}" == '/' ]; then
-        # absolute remote path
-        target_dir=${path2}
-    elif [ -n "${remote_base_dir}" ]; then
-        # relative remote path
-        target_dir=${remote_base_dir}/${path2}
-    else
-        # relative remote path
-        target_dir=${path2}
-    fi
-    ${ssh_connect} "ls -la ${target_dir} > /dev/null 2>&1"
-    check_error $? "Path '${target_dir}' does not exist."
+  fi
+}
 
-    if [ -f ${path1} ]; then
-        upload_type='f'
-        source_path=${path1}
-        source_dir=$(dirname ${path1})
-    elif [ -d ${path1} ]; then
-        upload_type='d'
-        source_path=${path1}
-        source_dir=${path1}
-    elif [ -n  "${local_base_dir}" ] && [ -f ${local_base_dir}/${path1} ]; then
-        upload_type='d'
-        source_path=${local_base_dir}/${path1}
-        source_dir=$(dirname ${local_base_dir}/${path1})
-    elif [ -n  "${local_base_dir}" ] && [ -d ${local_base_dir}/${path1} ]; then
-        upload_type='d'
-        source_path=${local_base_dir}/${path1}
-        source_dir=${local_base_dir}/${path1}
-    else
-        check_error 4 "error: Could not find source '${path1}'"
-    fi
+test_connection() {
+  ${ssh_connect} 'ls -la / > /dev/null 2>&1'
+  check_error $?
+  echo 'OK'
+}
 
-    if [ ${upload_type} = 'd' ] || [[ ! ${source_path} =~ .*\.tar\.gz$ ]]; then
-        printf "Packing file/s..."
-        if [ ${upload_type} = 'd' ]; then
-            tar czf $(basename ${source_path}).tar.gz -C ${source_path} . ${exclude}
-        else
-            tar czf $(basename ${source_path}).tar.gz ${source_path} ${exclude}
-        fi
-        check_error $?
-        echo -e "${t_OK}"
+deploy_target() {
+  # validate params
+  if [ -z "${path2}" ]; then
+      check_error 3 'Empty REMOTE_PATH argument.'
+  fi
+  if [ -z "${path1}" ]; then
+      check_error 3 'Empty LOCAL_PATH argument.'
+  fi
+  if [ "${path2::1}" == '/' ]; then
+      # absolute remote path
+      target_dir=${path2}
+  elif [ -n "${remote_base_dir}" ]; then
+      # relative remote path
+      target_dir=${remote_base_dir}/${path2}
+  else
+      # relative remote path
+      target_dir=${path2}
+  fi
+  ${ssh_connect} "ls -la ${target_dir} > /dev/null 2>&1"
+  check_error $? "Path '${target_dir}' does not exist."
 
-        source_archive=$(basename ${source_path}).tar.gz
-    else
-        source_archive=$(basename ${source_path})
-    fi
+  if [ -f ${path1} ]; then
+      upload_type='f'
+      source_path=${path1}
+      source_dir=$(dirname ${path1})
+  elif [ -d ${path1} ]; then
+      upload_type='d'
+      source_path=${path1}
+      source_dir=${path1}
+  elif [ -n  "${local_base_dir}" ] && [ -f ${local_base_dir}/${path1} ]; then
+      upload_type='d'
+      source_path=${local_base_dir}/${path1}
+      source_dir=$(dirname ${local_base_dir}/${path1})
+  elif [ -n  "${local_base_dir}" ] && [ -d ${local_base_dir}/${path1} ]; then
+      upload_type='d'
+      source_path=${local_base_dir}/${path1}
+      source_dir=${local_base_dir}/${path1}
+  else
+      check_error 4 "error: Could not find source '${path1}'"
+  fi
 
-    printf "Uploading archive..."
-    ${scp_connect} ${source_archive} ${connect}:${target_dir} && rm -f ${source_archive}
-    check_error $?
-    echo -e "Uploading archive...${t_OK}"
+  if [ ${upload_type} = 'd' ] || [[ ! ${source_path} =~ .*\.tar\.gz$ ]]; then
+      printf "Packing file/s..."
+      if [ ${upload_type} = 'd' ]; then
+          tar czf $(basename ${source_path}).tar.gz -C ${source_path} . ${exclude}
+      else
+          tar czf $(basename ${source_path}).tar.gz ${source_path} ${exclude}
+      fi
+      check_error $?
+      echo -e "${t_OK}"
 
-    printf "Unpacking archive..."
-    ${ssh_connect} "cd ${target_dir} && tar xzfm ${source_archive} && rm -f ${source_archive}"
-    check_error $?
-    echo -e "${t_OK}"
+      source_archive=$(basename ${source_path}).tar.gz
+  else
+      source_archive=$(basename ${source_path})
+  fi
 
-elif [ ${action_type} == 'download' ]; then
-    # validate params
-    ${ssh_connect} "ls -la ${path1} > /dev/null 2>&1"
-    check_error $? "Path does '${path1}' not exist."
-    if [ -n "${path2}" ] && [ ! -d "${path2}" ]; then
-        check_error 4 "No such directory '${path2}'."
-    fi
+  printf "Uploading archive..."
+  ${scp_connect} ${source_archive} ${connect}:${target_dir} && rm -f ${source_archive}
+  check_error $?
+  echo -e "Uploading archive...${t_OK}"
 
-    target_type=$(${ssh_connect} "[ -d ${path1} ] && echo d || echo f")
-    check_error $?
+  printf "Unpacking archive..."
+  ${ssh_connect} "cd ${target_dir} && tar xzfm ${source_archive} && rm -f ${source_archive}"
+  check_error $?
+  echo -e "${t_OK}"
+}
 
-    if [ ${target_type} == 'f' ]; then
-        target_basename=$(basename "${path1}")
-        target_to_archive=''
-        download_file=${path1}
-        if [[ ! "${target_basename}" =~ \.(tar|gz) ]]; then
-            # ignore packing archives
-            target_to_archive=$(basename "${path1}")
-        fi
-        target_dir=$(dirname "${path1}")
-    else
-        target_basename=$( basename "${path1}" )
-        target_to_archive='.'
-        target_dir=${path1}
-    fi
+download_target() {
+  # validate params
+  ${ssh_connect} "ls -la ${path1} > /dev/null 2>&1"
+  check_error $? "Path does '${path1}' not exist."
+  if [ -n "${path2}" ] && [ ! -d "${path2}" ]; then
+      check_error 4 "No such directory '${path2}'."
+  fi
+
+  target_type=$(${ssh_connect} "[ -d ${path1} ] && echo d || echo f")
+  check_error $?
+
+  if [ ${target_type} == 'f' ]; then
+      target_basename=$(basename "${path1}")
+      target_to_archive=''
+      download_file=${path1}
+      if [[ ! "${target_basename}" =~ \.(tar|gz) ]]; then
+          # ignore packing archives
+          target_to_archive=$(basename "${path1}")
+      fi
+      target_dir=$(dirname "${path1}")
+  else
+      target_basename=$( basename "${path1}" )
+      target_to_archive='.'
+      target_dir=${path1}
+  fi
 
 
-    if [ -n "${target_to_archive}" ]; then
-        printf "Packing file/s..."
-        download_file="~/${target_basename}.tar.gz"
-        ${ssh_connect} "tar cf ~/${target_basename}.tar.gz -C ${target_dir} ${target_to_archive} ${exclude}"
-        check_error $? 'Cannot make archive.'
-        echo -e "${t_OK}"
+  if [ -n "${target_to_archive}" ]; then
+      printf "Packing file/s..."
+      download_file="~/${target_basename}.tar.gz"
+      ${ssh_connect} "tar cf ~/${target_basename}.tar.gz -C ${target_dir} ${target_to_archive} ${exclude}"
+      check_error $? 'Cannot make archive.'
+      echo -e "${t_OK}"
+  fi
 
-    fi
+  printf "Downloading archive..."
+  ${scp_connect} ${connect}:${download_file} ./
+  check_error $? 'Unable to download archive.'
+  if [ -n "${target_to_archive}" ]; then
+      ${ssh_connect} "rm -rf ~/${target_basename}.tar.gz"
+      check_error $? 'Cannot remove created archive on the server.'
+  fi
+  echo -e "${t_OK}"
 
-    printf "Downloading archive..."
-    ${scp_connect} ${connect}:${download_file} ./
-    check_error $? 'Unable to download archive.'
-    if [ -n "${target_to_archive}" ]; then
-        ${ssh_connect} "rm -rf ~/${target_basename}.tar.gz"
-        check_error $? 'Cannot remove created archive on the server.'
-    fi
-    echo -e "${t_OK}"
+  if [ -n "${path2}" ]; then
+      printf "Unpacking archive..."
+      tar xf ./${target_basename}.tar.gz -C ${path2}
+      check_error $?
+      echo -e "${t_OK}"
+  else
+      echo 'Archive of target file/s: './${target_basename}.tar.gz
+  fi
+}
 
-    if [ -n "${path2}" ]; then
-        printf "Unpacking archive..."
-        tar xf ./${target_basename}.tar.gz -C ${path2}
-        check_error $?
-        echo -e "${t_OK}"
-    else
-        echo 'Archive of target file/s: '${current_pwd}/${target_basename}.tar.gz
-    fi
-fi
+process_deployment() {
+  # Green "OK"
+  t_OK='\e[0;32mOK\e[0m'
+
+  # Init passed params
+  read_params $@
+
+  current_pwd=$(pwd)
+  exclude=$(define_exclude_options)
+
+  if [ ${action_type} == 'test' ]; then
+    test_connection
+  elif [ ${action_type} == 'upload' ]; then
+    deploy_target
+  elif [ ${action_type} == 'download' ]; then
+    download_target
+  fi
+}
+
+process_deployment $@
