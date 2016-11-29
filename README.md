@@ -22,6 +22,16 @@ Now it should be ready to use.
 $ sscp --help
 ```
 
+## Global environment variables
+Global vars:
+- `SSCP_RC=.sscprc`     - Global resource file
+- `SSCP_SSH_BIN=ssh`    - SSH bin file
+- `SSCP_SCP_BIN=scp`    - SCP bin file
+- `SSCP_EXCLUDE=.idea`  - Custom exclude list.
+- `SSCP_TEMP=~`         - Temp directory for archive. It uses for remote servers.
+- `SSCP_CONNECT=.vagrant@127.0.0.1`
+                    - Connection host and user.
+
 ## Set connection parameters
 (Example with vagrant connection.)
 
