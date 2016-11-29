@@ -147,6 +147,8 @@ read_params () {
         ;;
     esac
   done
+
+  tar_options=$@
 }
 
 define_exclude_options() {
@@ -245,9 +247,9 @@ deploy_target() {
   if [ ${upload_type} = 'd' ] || [[ ! ${source_path} =~ .*\.tar\.gz$ ]]; then
       printf "Packing file/s..."
       if [ ${upload_type} = 'd' ]; then
-          tar czf $(basename ${source_path}).tar.gz -C ${source_path} . ${exclude}
+          tar czf $(basename ${source_path}).tar.gz -C ${source_path} . ${exclude} ${tar_options}
       else
-          tar czf $(basename ${source_path}).tar.gz ${source_path} ${exclude}
+          tar czf $(basename ${source_path}).tar.gz ${source_path} ${exclude} ${tar_options}
       fi
       check_error $?
       echo -e "${t_OK}"
@@ -298,7 +300,7 @@ download_target() {
   if [ -n "${target_to_archive}" ]; then
       printf "Packing file/s..."
       download_file="~/${target_basename}.tar.gz"
-      ${ssh_connect} "tar cf ~/${target_basename}.tar.gz -C ${target_dir} ${target_to_archive} ${exclude}"
+      ${ssh_connect} "tar cf ~/${target_basename}.tar.gz -C ${target_dir} ${target_to_archive} ${exclude} ${tar_options}"
       check_error $? 'Cannot make archive.'
       echo -e "${t_OK}"
   fi
