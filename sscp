@@ -89,7 +89,7 @@ SSCP_SSH_BIN=${SSCP_SSH_BIN:-ssh}
 SSCP_SCP_BIN=${SSCP_SCP_BIN:-scp}
 SSCP_EXCLUDE=${SSCP_EXCLUDE:-.idea}
 SSCP_CONNECT=${SSCP_CONNECT:-vagrant@127.0.0.1}
-SSCP_TEMP=${SSCP_TEMP:-$(cd; pwd)}
+SSCP_TEMP=${SSCP_TEMP:-'~'}
 
 check_error () {
   if [ $1 != 0 ]; then
@@ -341,6 +341,7 @@ download_target() {
     tar xf ./${target_basename}.tar.gz -C ${path2}
     check_error $?
     echo -e "${t_OK}"
+    rm -f ./${target_basename}.tar.gz
   else
     echo 'Archive of target file/s: './${target_basename}.tar.gz
   fi
