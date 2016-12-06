@@ -126,6 +126,7 @@ read_params () {
   action_type=''
   path1=''
   path2=''
+  port=''
 
   use_vcs=0
   exclude_on=1
@@ -236,7 +237,6 @@ init_connection() {
   ssh_connect=''
   scp_connect=''
   connect=${connect:-${SSCP_CONNECT}}
-  port=''
   remote_base_dir=''
   local_base_dir=''
   if [ -n "${config_file}" ]; then
@@ -245,14 +245,14 @@ init_connection() {
 
   if [ -z "${ssh_connect}" ]; then
     ssh_connect="${SSCP_SSH_BIN} ${connect}"
-    if [ -n "${port}" ]; then
+    if [ -n "${port:-}" ]; then
         ssh_connect+=" -P ${port}"
     fi
   fi
 
   if [ -z "${scp_connect}" ]; then
     scp_connect=${SSCP_SCP_BIN}
-    if [ -n "${port}" ]; then
+    if [ -n "${port:-}" ]; then
       scp_connect+=" -P ${port}"
     fi
   fi

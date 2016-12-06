@@ -35,27 +35,37 @@
 connect='localhost'
 EOF
 
-  result=$(sscp test)
+  run sscp test
 
   rm -f /tmp/sscp-bats-tests/.sscprc
 
-  [ 'OK' == "${result}" ]
+  [ 0 == ${status} ]
+  [ 'OK' == "${output}" ]
 }
 
-#@test "Test (negative) variable 'port' in .sscprc" {
-#  cd /tmp/sscp-bats-tests
-#  cat <<- EOF > /tmp/sscp-bats-tests/.sscprc
-#connect='localhost'
-#port=9999
-#EOF
-#
-#  export SSCP_NO_COLOR=1
-#  result=$(sscp test)
-#  rm -f /tmp/sscp-bats-tests/.sscprc
-#
-#  [ 'error: Cannot connect to the server (localhost 9999).' == "${result}" ]
-#}
-#
+@test "Test (negative) port." {
+  export SSCP_NO_COLOR=1
+  run sscp test --host localhost --port 1234
+
+  [ "${status}" -eq 2 ]
+  [ 'error: Cannot connect to the server (localhost 1234).' == "${output}" ]
+}
+
+@test "Test (negative) variable 'port' in .sscprc" {
+  cd /tmp/sscp-bats-tests
+  cat <<- EOF > /tmp/sscp-bats-tests/.sscprc
+connect='localhost'
+port=9999
+EOF
+
+  export SSCP_NO_COLOR=1
+  run sscp test
+  [ "${status}" -eq 2 ]
+  rm -f /tmp/sscp-bats-tests/.sscprc
+
+  [ 'error: Cannot connect to the server (localhost 9999).' == "${output}" ]
+}
+
 #@test "Test failed deploy." {
 #  rm -rf /tmp/sscp-bats-tests/tuser-target \
 #    /tmp/sscp-bats-tests/tuser
