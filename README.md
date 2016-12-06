@@ -31,6 +31,7 @@ Global vars:
 - `SSCP_TEMP=~`         - Temp directory for archive. It uses for remote servers.
 - `SSCP_CONNECT=.vagrant@127.0.0.1`
                     - Connection host and user.
+- `SSCP_NO_COLOR=1` - Disable colors in output.
 
 ## Set connection parameters
 (Example with vagrant connection.)
@@ -96,3 +97,6 @@ To get expanded help please use command:
 ```shell
 $ sscp --help
 ```
+
+# Run tests
+[Tests document](doc/run-tests.md).

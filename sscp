@@ -27,6 +27,17 @@ SSCP_SCP_BIN=${SSCP_SCP_BIN:-scp}
 SSCP_EXCLUDE=${SSCP_EXCLUDE:-.idea}
 SSCP_CONNECT=${SSCP_CONNECT:-vagrant@127.0.0.1}
 SSCP_TEMP=${SSCP_TEMP:-'~'}
+SSCP_NO_COLOR=${SSCP_NO_COLOR:-}
+
+if [ -n "${SSCP_NO_COLOR}" ]; then
+  t_red=''
+  t_green=''
+  t_reset=''
+else
+  t_red='\e[0;31m'
+  t_green='\e[0;32m'
+  t_reset='\e[0m'
+fi
 
 show_help () {
     cat << 'EOF'
@@ -35,10 +46,18 @@ Fast downloader/deployer for remote servers.
 It archives files by using tar and transports them using by SCP.
 Commands run by using SSH connection.
 
-$ sscp upload|U|download|D SOURCE_PATH TARGET_PATH \
-  [-p PORT] [-e|--ignore-excluding] [--use-vcs] [-- tar options]
-    LOCAL_PATH  Local path to directory or file to upload onto a remote server.
-    REMOTE_PATH Remote path to directory where packed file/s should be extracted.
+Base format:
+  $ sscp ACTION SOURCE_PATH TARGET_PATH
+
+Upload/download format:
+  $ sscp upload|U|download|D SOURCE_PATH TARGET_PATH \
+    [-p PORT] [-e|--ignore-excluding] [--use-vcs] [-- tar options]
+      LOCAL_PATH  Local path to directory or file to upload onto a remote server.
+      REMOTE_PATH Remote path to directory where packed file/s should be extracted.
+
+Test connection:
+  $ sscp test
+  OK
 
 UPLOAD
 Upload file or directory onto remote server. Command:
@@ -96,46 +115,59 @@ EOF
 
 check_error () {
   if [ $1 != 0 ]; then
-    echo -e '\e[0;31m''error''\e[0m '$2
+    echo -e "${t_red}error:${t_reset} "$2
     exit $1
   fi
 }
 
 read_params () {
   # Process args
-  # Action type: upload or download or U or D
-  action_type="${1:-}"
-  if [ "${action_type}" == '-h' ] || [ "${action_type}" == '--help' ]; then
-    show_help
-    exit
-  fi
-  if [ "${action_type}" == 'U' ]; then
-    action_type='upload'
-  fi
-  if [ "${action_type}" == 'D' ]; then
-    action_type='download'
-  fi
-  if [[ ! "${action_type}" =~ ^(upload|download|test)$ ]]; then
-    check_error 3 'Action type can be "upload" or "download". Use help to get more information: sscp -h'
-  fi
-  shift
 
-  # Argument 1
-  path1="$1"
-  shift
-  # Argument 2
+  action_type=''
+  path1=''
   path2=''
-  if [ -n "${1:-}" ] && [ '-' != "${1::1}" ]; then
-    path2=$1
-    shift
+
+  use_vcs=0
+  exclude_on=1
+  create_target_path=0
+
+  i=0
+  while [ -n "${1:-}" ] && [ "${1::1}" != '-' ]; do
+    (( i+=1 ))
+    if [ 1 == ${i} ]; then
+      # Action type: upload or download or U or D
+      action_type="${1:-}"
+      if [ "${action_type}" == '-h' ] || [ "${action_type}" == '--help' ]; then
+        show_help
+        exit
+      fi
+      if [ "${action_type}" == 'U' ]; then
+        action_type='upload'
+      fi
+      if [ "${action_type}" == 'D' ]; then
+        action_type='download'
+      fi
+      shift
+    elif [ 2 == ${i} ]; then
+      # Argument 1
+      path1="${1}"
+      shift
+    elif [ 3 == ${i} ]; then
+      # Argument 1
+      path2="${1}"
+      shift
+    fi
+  done
+
+  if [ -z "${1:-}" ]; then
+    return
   fi
 
   # Process options
   # validate and redefine options
-  OPTS=`getopt -o gp:h -l use-vcs,port:,help -- "$@"`
+  OPTS=`getopt -o gp:hH: -l use-vcs,port:,help,host: -- "$@"`
   eval set -- "${OPTS}"
-  use_vcs=0
-  exclude_on=1
+
   while true; do
     case "${1}" in
       -g|--use-vcs)
@@ -144,6 +176,10 @@ read_params () {
         ;;
       -e|--ignore-excluding)
         exclude_on=0
+        shift
+        ;;
+      -c|--create-destination)
+        create_target_path=1
         shift
         ;;
       -p|--port)
@@ -178,7 +214,7 @@ read_params () {
 
 define_exclude_options() {
   local exclude=''
-  local path=$1
+  local path=${1}
   if [ 1 == ${exclude_on} ]; then
     exclude='--exclude='${SSCP_EXCLUDE}
     if [ 0 == ${use_vcs} ] && [[ ! "${path1}" =~ \.git[^/]*$ ]]; then
@@ -223,19 +259,20 @@ init_connection() {
 }
 
 test_connection() {
-  ${ssh_connect} 'ls -la / > /dev/null 2>&1'
-  check_error $?
-  echo 'OK'
+  ${ssh_connect} 'ls -la / > /dev/null 2>&1 && echo OK || true'
 }
 
 deploy_target() {
+  test_connection
+
   # validate params
-  if [ -z "${path2}" ]; then
-    check_error 3 'Empty REMOTE_PATH argument.'
+  if [ -z "${path1:-}" ]; then
+    check_error 3 'Empty TARGET_PATH argument.'
   fi
-  if [ -z "${path1}" ]; then
-    check_error 3 'Empty LOCAL_PATH argument.'
+  if [ -z "${path2:-}" ]; then
+    check_error 3 'Empty SOURCE_PATH argument.'
   fi
+
   if [ "${path2::1}" == '/' ]; then
     # absolute remote path
     target_dir=${path2}
@@ -246,8 +283,14 @@ deploy_target() {
     # relative remote path
     target_dir=${path2}
   fi
-  ${ssh_connect} "ls -la ${target_dir} > /dev/null 2>&1"
-  check_error $? "Path '${target_dir}' does not exist."
+
+  if [ 0 == ${create_target_path} ] && [ 0 == $(${ssh_connect} "ls -la ${target_dir} > /dev/null 2>&1 && echo 1 || echo 0") ]; then
+    check_error 4 "Remote target directory ${target_dir} does not exist."
+  fi
+
+  if [ 1 == ${create_target_path} ] && [ 0 == $(${ssh_connect} "mkdir ${target_dir} -p > /dev/null 2>&1 && echo 1 || echo 0") ]; then
+    check_error 4 "Could not create remote target directory '${target_dir}'."
+  fi
 
   if [ -f ${path1} ]; then
     upload_type='f'
@@ -272,7 +315,7 @@ deploy_target() {
   if [ ${upload_type} = 'd' ] || [[ ! ${source_path} =~ .*\.tar\.gz$ ]]; then
     printf "Packing file/s..."
     if [ ${upload_type} = 'd' ]; then
-        tar czf $(basename ${source_path}).tar.gz -C ${source_path} . ${exclude} ${tar_options}
+      tar czf $(basename ${source_path}).tar.gz -C ${source_path} . ${exclude} ${tar_options}
     else
         tar czf $(basename ${source_path}).tar.gz ${source_path} ${exclude} ${tar_options}
     fi
@@ -311,8 +354,8 @@ download_target() {
     target_to_archive=''
     download_file=${path1}
     if [[ ! "${target_basename}" =~ \.(tar|gz) ]]; then
-        # ignore packing archives
-        target_to_archive=$(basename "${path1}")
+      # ignore packing archives
+      target_to_archive=$(basename "${path1}")
     fi
     target_dir=$(dirname "${path1}")
   else
@@ -320,7 +363,6 @@ download_target() {
     target_to_archive='.'
     target_dir=${path1}
   fi
-
 
   if [ -n "${target_to_archive}" ]; then
     printf "Packing file/s..."
@@ -330,7 +372,7 @@ download_target() {
     echo -e "${t_OK}"
   fi
 
-  printf "Downloading archive..."
+  printf 'Downloading archive...'
   ${scp_connect} ${connect}:${download_file} ./
   check_error $? 'Unable to download archive.'
   if [ -n "${target_to_archive}" ]; then
@@ -352,22 +394,43 @@ download_target() {
 
 process_deployment() {
   # Green "OK"
-  t_OK='\e[0;32mOK\e[0m'
+  t_OK=${t_green}'OK'${t_reset}
 
   # Init passed params
   read_params $@
 
-  current_pwd=$(pwd)
-  exclude=$(define_exclude_options ${path1})
+  if [ -z "${action_type}" ]; then
+    show_help
+    check_error 3 'Empty action type.'
+    return
+  fi
+
+  current_pwd=${PWD}
 
   init_connection
 
-  if [ ${action_type} == 'test' ]; then
-    test_connection
-  elif [ ${action_type} == 'upload' ]; then
+  if [ "${action_type}" == 'test' ]; then
+    if [ "$(test_connection)" == 'OK' ]; then
+      echo 'OK'
+    else
+      check_error 2 "Cannot connect to the server (${connect} ${port})."
+    fi
+    return
+  elif [ "${action_type}" == 'config-file' ]; then
+    echo ${config_file}
+    return
+  elif [ "${action_type}" == 'show-ssh-connection' ]; then
+    echo ${ssh_connect} "upload" or "download".
+  fi
+
+  exclude=$(define_exclude_options ${path1})
+
+  if [ "${action_type}" == 'upload' ]; then
     deploy_target
-  elif [ ${action_type} == 'download' ]; then
+  elif [ "${action_type}" == 'download' ]; then
     download_target
+  else
+    check_error 2 "Invalid action."
   fi
 }
 
