@@ -1,0 +1,10 @@
+version: '2'
+services:
+  app:
+    container_name: sscp-test
+    hostname: sscp.localhost
+    build: .
+    volumes:
+    - '.:/code'
+    ports:
+    - '127.0.225.225:225:22'

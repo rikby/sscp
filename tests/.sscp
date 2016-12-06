@@ -1,0 +1,2 @@
+connect="tuser@127.0.225.225 -i $(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/id_rsa"
+port=2255
