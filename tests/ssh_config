@@ -1,0 +1,9 @@
+Host localhost
+  User tuser
+  UserKnownHostsFile /dev/null
+  StrictHostKeyChecking no
+  PasswordAuthentication no
+  IdentityFile /code/tests/id_rsa
+  IdentitiesOnly yes
+  LogLevel FATAL
+  ForwardAgent yes

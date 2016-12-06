@@ -53,3 +53,8 @@ RUN echo 'tuser ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
 COPY tests/.bashrc /root/
 COPY tests/.bashrc /home/tuser/
 
+# add .ssh/config
+RUN mkdir -p /root/.ssh /home/tuser/.ssh
+COPY tests/ssh_config /root/.ssh/config
+COPY tests/ssh_config /home/tuser/.ssh/config
+RUN chmod go-rwx -R /root/.ssh /home/tuser/.ssh
