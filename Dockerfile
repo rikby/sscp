@@ -45,8 +45,6 @@ RUN mkdir -p /root/.ssh /home/tuser/.ssh && \
     chown tuser:tuser -R /home/tuser/.ssh
 ####### EOB Enable ssh access #######
 
-CMD /usr/sbin/sshd -D -e
-
 # Add tuser user into sudoers
 RUN echo 'tuser ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
 
@@ -61,4 +59,8 @@ RUN mkdir -p /root/.ssh /home/tuser/.ssh
 COPY tests/ssh_config /root/.ssh/config
 COPY tests/ssh_config /home/tuser/.ssh/config
 RUN chmod go-rwx -R /root/.ssh /home/tuser/.ssh
+
+COPY tests/enterpoint.sh /root/
+RUN chmod +x /root/enterpoint.sh
+ENTRYPOINT /root/enterpoint.sh /usr/sbin/sshd -D -e
 
