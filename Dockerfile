@@ -50,6 +50,9 @@ CMD /usr/sbin/sshd -D -e
 # Add tuser user into sudoers
 RUN echo 'tuser ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
 
+RUN curl -Ls https://github.com/sstephenson/bats/archive/master.tar.gz | tar -C /root -xzf - \
+  && bash /root/bats-master/install.sh /usr/local
+
 COPY tests/.bashrc /root/
 COPY tests/.bashrc /home/tuser/
 
@@ -58,3 +61,4 @@ RUN mkdir -p /root/.ssh /home/tuser/.ssh
 COPY tests/ssh_config /root/.ssh/config
 COPY tests/ssh_config /home/tuser/.ssh/config
 RUN chmod go-rwx -R /root/.ssh /home/tuser/.ssh
+
