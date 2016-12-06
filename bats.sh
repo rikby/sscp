@@ -43,6 +43,18 @@ EOF
   [ 'OK' == "${output}" ]
 }
 
+@test "Test variable SSCP_CONNECT." {
+  export SSCP_CONNECT=localhost
+  if [ -f ~/.ssh/known_hosts ]; then
+    ssh-keygen -R 127.0.0.1 || true
+  fi
+
+  run sscp test
+
+  [ 0 == ${status} ]
+  [ 'OK' == "${output}" ]
+}
+
 @test "Test (negative) port." {
   export SSCP_NO_COLOR=1
   run sscp test --host localhost --port 1234
