@@ -1,9 +1,10 @@
-Host localhost
+Host localhost host2.localhost host3.localhost
+  HostName 127.0.0.1
   User tuser
+  IdentityFile /code/tests/id_rsa
   UserKnownHostsFile /dev/null
   StrictHostKeyChecking no
   PasswordAuthentication no
-  IdentityFile /code/tests/id_rsa
   IdentitiesOnly yes
   LogLevel FATAL
   ForwardAgent yes
