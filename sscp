@@ -352,7 +352,7 @@ deploy_target() {
     check_error ${ERR_FILE_SYSTEM} "error: Could not find source '${path1}'"
   fi
 
-  put_printf "Upload: ${t_green}${source_path}${t_reset} => ${t_green}${target_dir}${t_reset}\n"
+  put_printf "local:${t_green}${source_path}${t_reset} => remote:${t_green}${target_dir}${t_reset}\n"
   if [ ${upload_type} = 'd' ] || [[ ! ${source_path} =~ .*\.tar\.gz$ ]]; then
     put_printf "Packing file/s..."
     if [ ${upload_type} = 'd' ]; then
@@ -403,7 +403,7 @@ download_target() {
     target_dir=${path1}
   fi
 
-  put_printf "Download: ${t_green}${path2:-./${target_basename}.tar.gz}${t_reset} <= ${t_green}${target_dir}/${target_to_archive}${t_reset}\n"
+  put_printf "local:${t_green}${path2:-./${target_basename}.tar.gz}${t_reset} <= remote:${t_green}${target_dir}/${target_to_archive}${t_reset}\n"
   if [ -n "${target_to_archive}" ]; then
     put_printf "Packing file/s..."
     download_file="${SSCP_TEMP}/${target_basename}.tar.gz"
