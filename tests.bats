@@ -1,4 +1,7 @@
 #!/usr/bin/env bats
+# Run tests by using bats
+# https://github.com/sstephenson/bats
+
 status=0
 output=''
 @test "Single run." {
