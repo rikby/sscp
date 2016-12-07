@@ -51,6 +51,19 @@ output=''
   [ ${status} == 0 ]
 }
 
+@test "Test --host with using SSCP_SILENT" {
+  export SSCP_SILENT=1
+  run sscp test --host localhost
+  [ "${output}" == '' ]
+  [ ${status} == 0 ]
+}
+
+@test "Test --host with using --silent" {
+  run sscp test --host localhost --silent
+  [ "${output}" == '' ]
+  [ ${status} == 0 ]
+}
+
 @test "Test (negative) --host" {
   export SSCP_NO_COLOR=1
   run sscp test --host wrong-host

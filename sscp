@@ -42,7 +42,7 @@ SSCP_TEMP=${SSCP_TEMP:-'~'}
 # disable using colors
 SSCP_NO_COLOR=${SSCP_NO_COLOR:-}
 # disable using colors
-SSCP_SILENT=${SSCP_SILENT:-}
+sscp_silent=${SSCP_SILENT:-0}
 
 if [ '1' == "${SSCP_NO_COLOR}" ]; then
   t_red=''
@@ -152,13 +152,13 @@ check_error () {
 }
 
 put_echo () {
-  [[ "${SSCP_SILENT}" -ne '1' ]] && echo -e ${@}
+  [[ "${sscp_silent}" -ne '1' ]] && echo -e ${@}
   return 0
 }
 put_printf () {
   local format=${1}
   shift
-  [[ "${SSCP_SILENT}" -ne '1' ]] && printf "${format}" ${@}
+  [[ "${sscp_silent}" -ne '1' ]] && printf "${format}" ${@}
   return 0
 }
 
@@ -206,7 +206,7 @@ read_params () {
 
   # Process options
   # validate and redefine options
-  OPTS=`getopt -o gp:hH:c -l use-vcs,port:,help,host:,create-destination -- "$@"`
+  OPTS=`getopt -o gp:hH:cs -l use-vcs,port:,help,host:,create-destination,silent -- "$@"`
   eval set -- "${OPTS}"
 
   while true; do
@@ -221,6 +221,10 @@ read_params () {
         ;;
       -c|--create-destination)
         create_target_path=1
+        shift
+        ;;
+      -s|--silent)
+        sscp_silent=1
         shift
         ;;
       -p|--port)
@@ -462,7 +466,7 @@ SSCP_EXCLUDE=${SSCP_EXCLUDE}
 SSCP_CONNECT=${SSCP_CONNECT}
 SSCP_TEMP=${SSCP_TEMP}
 SSCP_NO_COLOR=${SSCP_NO_COLOR}
-SSCP_SILENT=${SSCP_SILENT}
+SSCP_SILENT=${sscp_silent}
 EOF
     return
   fi
