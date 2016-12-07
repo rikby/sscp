@@ -30,10 +30,16 @@ Global vars:
 - `SSCP_EXCLUDE=.idea`  - Custom exclude list.
 - `SSCP_TEMP=~`         - Temp directory for archive. It uses for remote servers.
 - `SSCP_CONNECT=.vagrant@127.0.0.1`
-                    - Connection host and user.
-- `SSCP_NO_COLOR=1` - Disable colors in output.
+                        - Connection host and user.
+- `SSCP_NO_COLOR=1`     - Disable colors in output.
+- `SSCP_SILENT=1`       - Disable `stdout` output.
 
-## Set connection parameters
+You may print allowed environment variables:
+```
+$ sscp vars
+```
+
+## Set connection parameters in file `.sscprc`
 (Example with vagrant connection.)
 
 Initial `~/.sscprc` file with example of the connection to Vagrant VM.
@@ -41,8 +47,8 @@ Initial `~/.sscprc` file with example of the connection to Vagrant VM.
 connect='your-host'
 ```
 
-### With SSH config
-But it seems more useful will be add a SSH configuration:
+### Example of set up SSH config by using Vagrant
+But it will be more useful to add a SSH configuration:
 ```
 $ cat ~/.ssh/config
 Host your-host yh
@@ -59,7 +65,12 @@ Host your-host yh
 ```
 And define your connection only:
 ```shell
-connect='vagrant@your-host'
+connect='your-host'
+```
+
+```
+$ sscp test
+OK
 ```
 
 See `vagrant ssh-config` for vagrant.
@@ -70,7 +81,7 @@ Also you may add base paths:
 remote_base_dir='/var/www'
 local_base_dir='/d/home'
 ```
-### Default values
+### Default values of `.sscprc`
 By default it has values:
 ```shell
 connect='vagrant@127.0.0.1'

@@ -14,9 +14,9 @@ $ docker-compose up -d
 $ docker exec -ti sscp-test
 
 0 ✓ sscp
-$ bats /code/bats.sh
+$ bats /code/tests.bats
 ```
 Or just run:
 ```
-$ docker exec sscp-test bats /code/bats.sh
+$ docker exec sscp-test bats /code/tests.bats
 ```

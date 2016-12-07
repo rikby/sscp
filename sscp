@@ -81,6 +81,8 @@ Show path to config (if file was found):
   /home/my-user/.sscprc
 
 Show external environment SSCP_* variables
+  $ sscp show-vars
+  OR
   $ sscp vars
   SSCP_RC=.sscprc
   [...]
@@ -445,10 +447,10 @@ process_deployment() {
   elif [ "${action_type}" == 'config-file' ]; then
     echo ${config_file}
     return
-  elif [ "${action_type}" == 'show-ssh-connection' ]; then
+  elif [[ "${action_type}" =~ ^(show-)?ssh-connection$ ]]; then
     echo ${ssh_connect}.
     return
-  elif [ "${action_type}" == 'show-vars' ]; then
+  elif [[ "${action_type}" =~ ^(show-)?vars$ ]]; then
     cat << EOF
 SSCP_RC=${SSCP_RC}
 SSCP_BASE_DIR=${SSCP_BASE_DIR}

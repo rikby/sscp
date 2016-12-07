@@ -32,6 +32,13 @@ output=''
   [ '/tmp/sscp-bats-tests/.sscprc' == "$(sscp config-file)" ]
 }
 
+@test "Test showing vars." {
+  run sscp vars
+
+  [ "${status}" -eq 0 ]
+  echo "${output}" | grep 'SSCP_RC=.sscprc'
+}
+
 @test "Test --host" {
   run sscp test --host localhost
   [ "${output}" == 'OK' ]
