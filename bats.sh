@@ -1,12 +1,17 @@
 #!/usr/bin/env bats
-
-@test "Single run" {
-  sscp | sed -re 's/\x1B\[([0-9]{1,3}((;[0-9]{1,3})*)?)?[m|K]//g' | grep 'error: Empty action type.'
+status=0
+output=''
+@test "Single run." {
+  run sscp 2>&1
+  [ "${status}" -eq 3 ]
+  [[ "$(echo ${output} | sed -re 's/\x1B\[([0-9]{1,3}((;[0-9]{1,3})*)?)?[m|K]//g')" =~ 'error: Empty action type.' ]]
 }
 
-@test "Single run without colors" {
+@test "Single run without colors." {
   export SSCP_NO_COLOR=1
-  sscp | grep 'error: Empty action type.'
+  run sscp 2>&1
+  [ "${status}" -eq 3 ]
+  [[ "${output}" =~ 'error: Empty action type.' ]]
 }
 
 @test "Test --help." {
@@ -25,8 +30,14 @@
 }
 
 @test "Test --host" {
-  cd /
-  [ "$(sscp test --host localhost)" == 'OK' ]
+  run sscp test --host localhost
+  [ "${output}" == 'OK' ]
+}
+
+@test "Test (negative) --host" {
+  export SSCP_NO_COLOR=1
+  run sscp test --host wrong-host
+  [[ "${output}" =~ 'error: Cannot connect to the server (wrong-host ).' ]]
 }
 
 @test "Test variable 'connect' in .sscprc" {
@@ -78,22 +89,103 @@ EOF
   [ 'error: Cannot connect to the server (localhost 9999).' == "${output}" ]
 }
 
-#@test "Test failed deploy." {
-#  rm -rf /tmp/sscp-bats-tests/tuser-target \
-#    /tmp/sscp-bats-tests/tuser
-#
-#  mkdir -p /tmp/sscp-bats-tests/tuser/test1
-#  mkdir -p /tmp/sscp-bats-tests/tuser-target
-#
-#  touch /tmp/sscp-bats-tests/tuser/.gitignore
-#  touch /tmp/sscp-bats-tests/tuser/.hidden
-#  touch /tmp/sscp-bats-tests/tuser/test1/some-file
-#
-#  sscp D /tmp/sscp-bats-tests/tuser /tmp/sscp-bats-tests/tuser-target --host localhost
-#
-#  read -r -d '' expected <<'EOF'
-#./test1/some-file
-#./.hidden
-#EOF
-#  [ ${expected} == $(cd /tmp/sscp-bats-tests/tuser-target; find . -type f) ]
-#}
+@test "Test download." {
+  rm -rf /tmp/sscp-bats-tests/tuser-target \
+    /tmp/sscp-bats-tests/tuser
+
+  mkdir -p /tmp/sscp-bats-tests/tuser/test1
+  mkdir -p /tmp/sscp-bats-tests/tuser-target
+
+  touch /tmp/sscp-bats-tests/tuser/.gitignore
+  touch /tmp/sscp-bats-tests/tuser/.hidden
+  touch /tmp/sscp-bats-tests/tuser/test1/some-file
+
+  run sscp D /tmp/sscp-bats-tests/tuser /tmp/sscp-bats-tests/tuser-target --host localhost
+
+  [ "${status}" -eq 0 ]
+
+  expected=$(printf \
+"./test1/some-file
+./.hidden")
+  result=$(cd /tmp/sscp-bats-tests/tuser-target; find . -type f)
+
+  [[ "${expected}" == "${result}" ]]
+}
+
+@test "Test download with VCS files." {
+  rm -rf /tmp/sscp-bats-tests/tuser-target \
+    /tmp/sscp-bats-tests/tuser
+
+  mkdir -p /tmp/sscp-bats-tests/tuser/test1
+  mkdir -p /tmp/sscp-bats-tests/tuser-target
+
+  touch /tmp/sscp-bats-tests/tuser/.gitignore
+  touch /tmp/sscp-bats-tests/tuser/.hidden
+  touch /tmp/sscp-bats-tests/tuser/test1/some-file
+  touch /tmp/sscp-bats-tests/tuser/test1/.gitignore
+
+  run sscp D /tmp/sscp-bats-tests/tuser /tmp/sscp-bats-tests/tuser-target --host localhost --use-vcs
+
+  [ "${status}" -eq 0 ]
+
+  expected=$(printf \
+"./test1/some-file
+./test1/.gitignore
+./.gitignore
+./.hidden")
+  result=$(cd /tmp/sscp-bats-tests/tuser-target; find . -type f)
+
+  [[ "${expected}" == "${result}" ]]
+}
+
+@test "Test upload." {
+  rm -rf /tmp/sscp-bats-tests/tuser-target \
+    /tmp/sscp-bats-tests/tuser
+
+  mkdir -p /tmp/sscp-bats-tests/tuser/test1
+  mkdir -p /tmp/sscp-bats-tests/tuser-target
+  chown tuser -R /tmp/sscp-bats-tests/tuser-target
+
+  touch /tmp/sscp-bats-tests/tuser/.gitignore
+  touch /tmp/sscp-bats-tests/tuser/.hidden
+  touch /tmp/sscp-bats-tests/tuser/test1/some-file
+  touch /tmp/sscp-bats-tests/tuser/test1/.gitignore
+
+  run sscp U /tmp/sscp-bats-tests/tuser /tmp/sscp-bats-tests/tuser-target --host localhost
+
+  [ "${status}" -eq 0 ]
+
+  expected=$(printf \
+"./test1/some-file
+./.hidden")
+  result=$(cd /tmp/sscp-bats-tests/tuser-target; find . -type f)
+
+  [[ "${expected}" == "${result}" ]]
+}
+
+@test "Test upload with VCS files." {
+  rm -rf /tmp/sscp-bats-tests/tuser-target \
+    /tmp/sscp-bats-tests/tuser
+
+  mkdir -p /tmp/sscp-bats-tests/tuser/test1
+  mkdir -p /tmp/sscp-bats-tests/tuser-target
+  chown tuser -R /tmp/sscp-bats-tests/tuser-target
+
+  touch /tmp/sscp-bats-tests/tuser/.gitignore
+  touch /tmp/sscp-bats-tests/tuser/.hidden
+  touch /tmp/sscp-bats-tests/tuser/test1/some-file
+  touch /tmp/sscp-bats-tests/tuser/test1/.gitignore
+
+  run sscp U /tmp/sscp-bats-tests/tuser /tmp/sscp-bats-tests/tuser-target --host localhost --use-vcs
+
+  [ "${status}" -eq 0 ]
+
+  expected=$(printf \
+"./test1/some-file
+./test1/.gitignore
+./.gitignore
+./.hidden")
+  result=$(cd /tmp/sscp-bats-tests/tuser-target; find . -type f)
+
+  [[ "${expected}" == "${result}" ]]
+}

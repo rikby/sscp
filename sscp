@@ -21,15 +21,24 @@ __file="${__dir}/$(basename "${BASH_SOURCE[0]}")"
 readonly __dir __file
 
 SSCP_RC=${SSCP_RC:-.sscprc}
+# directory where base .sscprc file
 SSCP_BASE_DIR=${SSCP_BASE_DIR:-$(cd; pwd)}
+# SSH binary file
 SSCP_SSH_BIN=${SSCP_SSH_BIN:-ssh}
+# SCP binary file
 SSCP_SCP_BIN=${SSCP_SCP_BIN:-scp}
+# Default exclude list
 SSCP_EXCLUDE=${SSCP_EXCLUDE:-.idea}
+# Default connection
 SSCP_CONNECT=${SSCP_CONNECT:-vagrant@127.0.0.1}
+# Default temp directory. It uses in a remote server as well
 SSCP_TEMP=${SSCP_TEMP:-'~'}
+# disable using colors
 SSCP_NO_COLOR=${SSCP_NO_COLOR:-}
+# disable using colors
+SSCP_SILENT=${SSCP_SILENT:-}
 
-if [ -n "${SSCP_NO_COLOR}" ]; then
+if [ '1' == "${SSCP_NO_COLOR}" ]; then
   t_red=''
   t_green=''
   t_reset=''
@@ -84,6 +93,7 @@ OPTIONS
               Include VCS file into transition archives.
               It excludes .idea files and VCS. This option will disable
               excluding VCS files.
+  -s|silent   Disable output.
   -H|--host HOST
               Connection host. It can be passed with a username.
               root@example.com
@@ -115,9 +125,16 @@ EOF
 
 check_error () {
   if [ $1 != 0 ]; then
-    echo -e "${t_red}error:${t_reset} "$2
+    echo -e "${t_red}error:${t_reset} "$2 > /dev/stderr
     exit $1
   fi
+}
+
+put_echo () {
+  [ "${SSCP_SILENT}" != '1' ] && echo -e ${@}
+}
+put_printf () {
+  [ "${SSCP_SILENT}" != '1' ] && printf ${@}
 }
 
 read_params () {
@@ -259,11 +276,11 @@ init_connection() {
 }
 
 test_connection() {
-  ${ssh_connect} 'ls -la / > /dev/null 2>&1 && echo OK || true'
+  ${ssh_connect} 'ls -la / > /dev/null 2>&1 && echo OK'
 }
 
 deploy_target() {
-  test_connection
+  test_connection 1> /dev/null
 
   # validate params
   if [ -z "${path1:-}" ]; then
@@ -313,29 +330,28 @@ deploy_target() {
   fi
 
   if [ ${upload_type} = 'd' ] || [[ ! ${source_path} =~ .*\.tar\.gz$ ]]; then
-    printf "Packing file/s..."
+    put_printf "Packing file/s..."
     if [ ${upload_type} = 'd' ]; then
       tar czf $(basename ${source_path}).tar.gz -C ${source_path} . ${exclude} ${tar_options}
     else
         tar czf $(basename ${source_path}).tar.gz ${source_path} ${exclude} ${tar_options}
     fi
-    check_error $?
-    echo -e "${t_OK}"
+    put_echo "${t_OK}"
 
     source_archive=$(basename ${source_path}).tar.gz
   else
     source_archive=$(basename ${source_path})
   fi
 
-  printf "Uploading archive..."
+  put_printf "Uploading archive..."
   ${scp_connect} ${source_archive} ${connect}:${target_dir} && rm -f ${source_archive}
-  check_error $?
-  echo -e "Uploading archive...${t_OK}"
+  check_error $? 'Cannot upload archive.'
+  put_echo "Uploading archive...${t_OK}"
 
-  printf "Unpacking archive..."
+  put_printf "Unpacking archive..."
   ${ssh_connect} "cd ${target_dir} && tar xzfm ${source_archive} && rm -f ${source_archive}"
-  check_error $?
-  echo -e "${t_OK}"
+  check_error $? 'Cannot unpack archive.'
+  put_echo "${t_OK}"
 }
 
 download_target() {
@@ -347,7 +363,6 @@ download_target() {
   fi
 
   target_type=$(${ssh_connect} "[ -d ${path1} ] && echo d || echo f")
-  check_error $?
 
   if [ ${target_type} == 'f' ]; then
     target_basename=$(basename "${path1}")
@@ -365,27 +380,24 @@ download_target() {
   fi
 
   if [ -n "${target_to_archive}" ]; then
-    printf "Packing file/s..."
+    put_printf "Packing file/s..."
     download_file="${SSCP_TEMP}/${target_basename}.tar.gz"
     ${ssh_connect} "tar cf ${SSCP_TEMP}/${target_basename}.tar.gz -C ${target_dir} ${target_to_archive} ${exclude} ${tar_options}"
-    check_error $? 'Cannot make archive.'
-    echo -e "${t_OK}"
+    put_echo "${t_OK}"
   fi
 
-  printf 'Downloading archive...'
+  put_printf 'Downloading archive...'
   ${scp_connect} ${connect}:${download_file} ./
   check_error $? 'Unable to download archive.'
   if [ -n "${target_to_archive}" ]; then
     ${ssh_connect} "rm -rf ${SSCP_TEMP}/${target_basename}.tar.gz"
-    check_error $? 'Cannot remove created archive on the server.'
   fi
-  echo -e "${t_OK}"
+  put_echo "${t_OK}"
 
   if [ -n "${path2}" ]; then
-    printf "Unpacking archive..."
+    put_printf "Unpacking archive..."
     tar xf ./${target_basename}.tar.gz -C ${path2}
-    check_error $?
-    echo -e "${t_OK}"
+    put_echo "${t_OK}"
     rm -f ./${target_basename}.tar.gz
   else
     echo 'Archive of target file/s: './${target_basename}.tar.gz
@@ -410,17 +422,27 @@ process_deployment() {
   init_connection
 
   if [ "${action_type}" == 'test' ]; then
-    if [ "$(test_connection)" == 'OK' ]; then
-      echo 'OK'
-    else
-      check_error 2 "Cannot connect to the server (${connect} ${port})."
-    fi
+    test_connection || check_error 2 "Cannot connect to the server (${connect} ${port})."
     return
   elif [ "${action_type}" == 'config-file' ]; then
     echo ${config_file}
     return
   elif [ "${action_type}" == 'show-ssh-connection' ]; then
-    echo ${ssh_connect} "upload" or "download".
+    echo ${ssh_connect}.
+    return
+  elif [ "${action_type}" == 'show-vars' ]; then
+    cat << EOF
+SSCP_RC=${SSCP_RC}
+SSCP_BASE_DIR=${SSCP_BASE_DIR}
+SSCP_SSH_BIN=${SSCP_SSH_BIN}
+SSCP_SCP_BIN=${SSCP_SCP_BIN}
+SSCP_EXCLUDE=${SSCP_EXCLUDE}
+SSCP_CONNECT=${SSCP_CONNECT}
+SSCP_TEMP=${SSCP_TEMP}
+SSCP_NO_COLOR=${SSCP_NO_COLOR}
+SSCP_SILENT=${SSCP_SILENT}
+EOF
+    return
   fi
 
   exclude=$(define_exclude_options ${path1})
