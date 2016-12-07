@@ -34,6 +34,13 @@ output=''
   [ "${output}" == 'OK' ]
 }
 
+@test "Test --host with silent mode" {
+  export SSCP_SILENT=1
+  run sscp test --host localhost
+  [ "${output}" == '' ]
+  [ ${status} == 0 ]
+}
+
 @test "Test (negative) --host" {
   export SSCP_NO_COLOR=1
   run sscp test --host wrong-host
@@ -47,7 +54,6 @@ connect='localhost'
 EOF
 
   run sscp test
-
   rm -f /tmp/sscp-bats-tests/.sscprc
 
   [ 0 == ${status} ]
@@ -70,8 +76,8 @@ EOF
   export SSCP_NO_COLOR=1
   run sscp test --host localhost --port 1234
 
-  [ "${status}" -eq 2 ]
-  [ 'error: Cannot connect to the server (localhost 1234).' == "${output}" ]
+  [ "${status}" -eq 1 ]
+  [[ 'error: Cannot connect to the server (localhost 1234).' =~ "${output}" ]]
 }
 
 @test "Test (negative) variable 'port' in .sscprc" {
@@ -83,10 +89,9 @@ EOF
 
   export SSCP_NO_COLOR=1
   run sscp test
-  [ "${status}" -eq 2 ]
-  rm -f /tmp/sscp-bats-tests/.sscprc
 
-  [ 'error: Cannot connect to the server (localhost 9999).' == "${output}" ]
+  [ "${status}" -eq 1 ]
+  [[ 'error: Cannot connect to the server (localhost 9999).' =~ "${output}" ]]
 }
 
 @test "Test download." {

@@ -20,6 +20,12 @@ __dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 __file="${__dir}/$(basename "${BASH_SOURCE[0]}")"
 readonly __dir __file
 
+ERR_FATAL=1
+ERR_LOGIC=2
+ERR_PARAMS=3
+ERR_FILE_SYSTEM=4
+readonly ERR_FATAL ERR_LOGIC ERR_PARAMS ERR_FILE_SYSTEM
+
 SSCP_RC=${SSCP_RC:-.sscprc}
 # directory where base .sscprc file
 SSCP_BASE_DIR=${SSCP_BASE_DIR:-$(cd; pwd)}
@@ -47,6 +53,8 @@ else
   t_green='\e[0;32m'
   t_reset='\e[0m'
 fi
+# Green "OK"
+t_OK=${t_green}'OK'${t_reset}
 
 show_help () {
     cat << 'EOF'
@@ -67,6 +75,15 @@ Upload/download format:
 Test connection:
   $ sscp test
   OK
+
+Show path to config (if file was found):
+  $ sscp config-file
+  /home/my-user/.sscprc
+
+Show external environment SSCP_* variables
+  $ sscp vars
+  SSCP_RC=.sscprc
+  [...]
 
 UPLOAD
 Upload file or directory onto remote server. Command:
@@ -131,15 +148,19 @@ check_error () {
 }
 
 put_echo () {
-  [ "${SSCP_SILENT}" != '1' ] && echo -e ${@}
+  [[ "${SSCP_SILENT}" -ne '1' ]] && echo -e ${@}
+  return 0
 }
 put_printf () {
-  [ "${SSCP_SILENT}" != '1' ] && printf ${@}
+  [[ "${SSCP_SILENT}" -ne '1' ]] && printf ${@}
+  return 0
 }
 
 read_params () {
   # Process args
 
+  # Default values
+  tar_options=''
   action_type=''
   path1=''
   path2=''
@@ -149,29 +170,25 @@ read_params () {
   exclude_on=1
   create_target_path=0
 
+  # Read arguments
   i=0
   while [ -n "${1:-}" ] && [ "${1::1}" != '-' ]; do
     (( i+=1 ))
     if [ 1 == ${i} ]; then
       # Action type: upload or download or U or D
       action_type="${1:-}"
-      if [ "${action_type}" == '-h' ] || [ "${action_type}" == '--help' ]; then
-        show_help
-        exit
-      fi
       if [ "${action_type}" == 'U' ]; then
         action_type='upload'
-      fi
-      if [ "${action_type}" == 'D' ]; then
+      elif [ "${action_type}" == 'D' ]; then
         action_type='download'
       fi
       shift
     elif [ 2 == ${i} ]; then
-      # Argument 1
+      # Argument 2 - SOURCE_PATH
       path1="${1}"
       shift
     elif [ 3 == ${i} ]; then
-      # Argument 1
+      # Argument 3 - TARGET_PATH
       path2="${1}"
       shift
     fi
@@ -222,7 +239,7 @@ read_params () {
         ;;
       *)
         echo "${0}: unparseable option ${1}."
-        exit 3
+        exit ${ERR_PARAMS}
         ;;
     esac
   done
@@ -263,7 +280,7 @@ init_connection() {
   if [ -z "${ssh_connect}" ]; then
     ssh_connect="${SSCP_SSH_BIN} ${connect}"
     if [ -n "${port:-}" ]; then
-        ssh_connect+=" -P ${port}"
+        ssh_connect+=" -p ${port}"
     fi
   fi
 
@@ -276,7 +293,7 @@ init_connection() {
 }
 
 test_connection() {
-  ${ssh_connect} 'ls -la / > /dev/null 2>&1 && echo OK'
+  ${ssh_connect} -C 'pwd > /dev/null' && put_echo 'OK'
 }
 
 deploy_target() {
@@ -284,10 +301,10 @@ deploy_target() {
 
   # validate params
   if [ -z "${path1:-}" ]; then
-    check_error 3 'Empty TARGET_PATH argument.'
+    check_error ${ERR_PARAMS} 'Empty TARGET_PATH argument.'
   fi
   if [ -z "${path2:-}" ]; then
-    check_error 3 'Empty SOURCE_PATH argument.'
+    check_error ${ERR_PARAMS} 'Empty SOURCE_PATH argument.'
   fi
 
   if [ "${path2::1}" == '/' ]; then
@@ -302,11 +319,11 @@ deploy_target() {
   fi
 
   if [ 0 == ${create_target_path} ] && [ 0 == $(${ssh_connect} "ls -la ${target_dir} > /dev/null 2>&1 && echo 1 || echo 0") ]; then
-    check_error 4 "Remote target directory ${target_dir} does not exist."
+    check_error ${ERR_FILE_SYSTEM} "Remote target directory ${target_dir} does not exist."
   fi
 
   if [ 1 == ${create_target_path} ] && [ 0 == $(${ssh_connect} "mkdir ${target_dir} -p > /dev/null 2>&1 && echo 1 || echo 0") ]; then
-    check_error 4 "Could not create remote target directory '${target_dir}'."
+    check_error ${ERR_FILE_SYSTEM} "Could not create remote target directory '${target_dir}'."
   fi
 
   if [ -f ${path1} ]; then
@@ -326,7 +343,7 @@ deploy_target() {
     source_path=${local_base_dir}/${path1}
     source_dir=${local_base_dir}/${path1}
   else
-    check_error 4 "error: Could not find source '${path1}'"
+    check_error ${ERR_FILE_SYSTEM} "error: Could not find source '${path1}'"
   fi
 
   if [ ${upload_type} = 'd' ] || [[ ! ${source_path} =~ .*\.tar\.gz$ ]]; then
@@ -334,7 +351,7 @@ deploy_target() {
     if [ ${upload_type} = 'd' ]; then
       tar czf $(basename ${source_path}).tar.gz -C ${source_path} . ${exclude} ${tar_options}
     else
-        tar czf $(basename ${source_path}).tar.gz ${source_path} ${exclude} ${tar_options}
+      tar czf $(basename ${source_path}).tar.gz ${source_path} ${exclude} ${tar_options}
     fi
     put_echo "${t_OK}"
 
@@ -359,7 +376,7 @@ download_target() {
   ${ssh_connect} "ls -la ${path1} > /dev/null 2>&1"
   check_error $? "Path does '${path1}' not exist."
   if [ -n "${path2}" ] && [ ! -d "${path2}" ]; then
-    check_error 4 "No such directory '${path2}'."
+    check_error ${ERR_FILE_SYSTEM} "No such directory '${path2}'."
   fi
 
   target_type=$(${ssh_connect} "[ -d ${path1} ] && echo d || echo f")
@@ -405,15 +422,12 @@ download_target() {
 }
 
 process_deployment() {
-  # Green "OK"
-  t_OK=${t_green}'OK'${t_reset}
-
   # Init passed params
   read_params $@
 
   if [ -z "${action_type}" ]; then
     show_help
-    check_error 3 'Empty action type.'
+    check_error ${ERR_PARAMS} 'Empty action type.'
     return
   fi
 
@@ -422,7 +436,7 @@ process_deployment() {
   init_connection
 
   if [ "${action_type}" == 'test' ]; then
-    test_connection || check_error 2 "Cannot connect to the server (${connect} ${port})."
+    test_connection || check_error ${ERR_FATAL} "Cannot connect to the server (${connect} ${port})."
     return
   elif [ "${action_type}" == 'config-file' ]; then
     echo ${config_file}
@@ -452,7 +466,7 @@ EOF
   elif [ "${action_type}" == 'download' ]; then
     download_target
   else
-    check_error 2 "Invalid action."
+    check_error ${ERR_PARAMS} "Invalid action."
   fi
 }
 
