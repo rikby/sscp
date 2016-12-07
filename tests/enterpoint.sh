@@ -5,6 +5,4 @@ if [ -f /code/sscp ] && [ ! -L /usr/local/bin/sscp ] ; then
   chmod +x /usr/local/bin/sscp /code/sscp
 fi
 
-echo "--- $@"
-
 $@
