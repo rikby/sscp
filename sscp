@@ -359,6 +359,7 @@ deploy_target() {
   put_printf "local:${t_green}${source_path}${t_reset} => remote:${t_green}${target_dir}${t_reset}\n"
   if [ ${upload_type} = 'd' ] || [[ ! ${source_path} =~ .*\.tar\.gz$ ]]; then
     put_printf "Packing file/s..."
+    rm -f $(basename ${source_path}).tar.gz
     if [ ${upload_type} = 'd' ]; then
       tar czf $(basename ${source_path}).tar.gz -C ${source_path} . ${exclude} ${tar_options}
     else
@@ -411,7 +412,8 @@ download_target() {
   if [ -n "${target_to_archive}" ]; then
     put_printf "Packing file/s..."
     download_file="${SSCP_TEMP}/${target_basename}.tar.gz"
-    ${ssh_connect} "tar cf ${SSCP_TEMP}/${target_basename}.tar.gz -C ${target_dir} ${target_to_archive} ${exclude} ${tar_options}"
+    ${ssh_connect} "rm -f ${download_file}" # clean up
+    ${ssh_connect} "tar cf ${download_file} -C ${target_dir} ${target_to_archive} ${exclude} ${tar_options}"
     put_echo "${t_OK}"
   fi
 
