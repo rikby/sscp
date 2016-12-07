@@ -194,3 +194,28 @@ EOF
 
   [[ "${expected}" == "${result}" ]]
 }
+
+@test "Test creating destination path during upload." {
+  rm -rf /tmp/sscp-bats-tests/tuser-target \
+    /tmp/sscp-bats-tests/tuser
+
+  mkdir -p /tmp/sscp-bats-tests/tuser/test1
+  mkdir -p /tmp/sscp-bats-tests/tuser-target
+  chown tuser -R /tmp/sscp-bats-tests/tuser-target
+
+  touch /tmp/sscp-bats-tests/tuser/.gitignore
+  touch /tmp/sscp-bats-tests/tuser/.hidden
+  touch /tmp/sscp-bats-tests/tuser/test1/some-file
+  touch /tmp/sscp-bats-tests/tuser/test1/.gitignore
+
+  run sscp U /tmp/sscp-bats-tests/tuser /tmp/sscp-bats-tests/tuser-target/new-dir --host localhost --create-destination
+
+  [ "${status}" -eq 0 ]
+
+  expected=$(printf \
+"./test1/some-file
+./.hidden")
+  result=$(cd /tmp/sscp-bats-tests/tuser-target/new-dir; find . -type f)
+
+  [[ "${expected}" == "${result}" ]]
+}

@@ -57,18 +57,18 @@ fi
 t_OK=${t_green}'OK'${t_reset}
 
 show_help () {
-    cat << 'EOF'
+    cat << EOF
 SSCP Shell Tool v0.3.0
 Fast downloader/deployer for remote servers.
-It archives files by using tar and transports them using by SCP.
-Commands run by using SSH connection.
+It archives files by using tar and transports them using by SCP. So, just pack and transfer.
+All commands run by using SSH connection.
 
 Base format:
   $ sscp ACTION SOURCE_PATH TARGET_PATH
 
 Upload/download format:
-  $ sscp upload|U|download|D SOURCE_PATH TARGET_PATH \
-    [-p PORT] [-e|--ignore-excluding] [--use-vcs] [-- tar options]
+  $ sscp upload|U|download|D SOURCE_PATH TARGET_PATH \\
+    [OPTIONS]
       LOCAL_PATH  Local path to directory or file to upload onto a remote server.
       REMOTE_PATH Remote path to directory where packed file/s should be extracted.
 
@@ -116,6 +116,8 @@ OPTIONS
               root@example.com
   -e|--ignore-excluding
               Ignore all default excluding.
+  -c|--create-destination
+              Create destination path automatically.
   -h|--help   Show this help
 
 CONNECTION PARAMETERS
@@ -132,7 +134,7 @@ File in the current directory has higher priority the in home user directory.
 Example of .sscprc:
 connect='vagrant@127.0.0.1'
 port='2222'
-ssh_connect="ssh ${connect} -p ${port}"
+ssh_connect="ssh \${connect} -p \${port}"
 remote_base_dir='/var/www'
 local_base_dir='/d/home'
 
@@ -152,7 +154,9 @@ put_echo () {
   return 0
 }
 put_printf () {
-  [[ "${SSCP_SILENT}" -ne '1' ]] && printf ${@}
+  local format=${1}
+  shift
+  [[ "${SSCP_SILENT}" -ne '1' ]] && printf "${format}" ${@}
   return 0
 }
 
@@ -200,7 +204,7 @@ read_params () {
 
   # Process options
   # validate and redefine options
-  OPTS=`getopt -o gp:hH: -l use-vcs,port:,help,host: -- "$@"`
+  OPTS=`getopt -o gp:hH:c -l use-vcs,port:,help,host:,create-destination -- "$@"`
   eval set -- "${OPTS}"
 
   while true; do
