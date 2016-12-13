@@ -47,7 +47,8 @@ SSCP_TEMP=${SSCP_TEMP:-'~'}
 # disable using colors
 SSCP_NO_COLOR=${SSCP_NO_COLOR:-0}
 # verbose level
-sscp_verbose=${SSCP_VERBOSE:-${VERBOSE}}
+SSCP_VERBOSE=${SSCP_VERBOSE:-${VERBOSE}}
+sscp_verbose=${SSCP_VERBOSE}
 
 connect=${connect:-${SSCP_CONNECT}}
 
@@ -517,15 +518,24 @@ process_deployment() {
     return
   elif [[ "${action_type}" =~ ^(show-)?vars$ ]]; then
     cat << EOF
+# default name of config file
 SSCP_RC=${SSCP_RC}
+# directory where base .sscprc file
 SSCP_BASE_DIR=${SSCP_BASE_DIR}
+# SSH binary file
 SSCP_SSH_BIN=${SSCP_SSH_BIN}
+# SCP binary file
 SSCP_SCP_BIN=${SSCP_SCP_BIN}
+# Default exclude list
 SSCP_EXCLUDE=${SSCP_EXCLUDE}
+# Default connection
 SSCP_CONNECT=${SSCP_CONNECT}
+# Default temp directory. It uses in a remote server as well
 SSCP_TEMP=${SSCP_TEMP}
+# disable using colors
 SSCP_NO_COLOR=${SSCP_NO_COLOR}
-SSCP_VERBOSE=${SSCP_VERBOSE:-}
+# default verbose level (0- silent, 1- normal, 2- "very" mode, 3- debug)
+SSCP_VERBOSE=${SSCP_VERBOSE}
 EOF
     return
   fi
