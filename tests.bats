@@ -32,6 +32,26 @@ output=''
   [ '/tmp/sscp-bats-tests/.sscprc' == "$(sscp config-file)" ]
 }
 
+@test "Test status of show-vars." {
+  run sscp show-vars
+  [ "${status}" -eq 0 ]
+}
+
+@test "Test show-ssh-connection from .sscprc." {
+  rm -rf /tmp/sscp-bats-tests/tuser
+  mkdir -p /tmp/sscp-bats-tests/tuser
+  cat <<- EOF > /tmp/sscp-bats-tests/tuser/.sscprc
+connect='invalid.localhost'
+port=19999
+EOF
+  cd /tmp/sscp-bats-tests/tuser
+
+  run sscp show-ssh-connection
+
+  [ "${status}" -eq 0 ]
+  [ "${output}" == 'ssh invalid.localhost -p 19999' ]
+}
+
 @test "Test showing vars." {
   run sscp vars
 
@@ -80,6 +100,21 @@ EOF
 
   [ 0 == ${status} ]
   [ 'OK' == "${output}" ]
+}
+
+@test "Test overriding host and port from .sscprc with params (show-ssh-connection)." {
+  rm -rf /tmp/sscp-bats-tests/tuser
+  mkdir -p /tmp/sscp-bats-tests/tuser
+  cat <<- EOF > /tmp/sscp-bats-tests/tuser/.sscprc
+connect='invalid.localhost'
+port=19999
+EOF
+  cd /tmp/sscp-bats-tests/tuser
+
+  run sscp show-ssh-connection --host localhost --port 22
+
+  [ "${status}" -eq 0 ]
+  [ "${output}" == 'ssh localhost -p 22' ]
 }
 
 @test "Test variable SSCP_CONNECT." {

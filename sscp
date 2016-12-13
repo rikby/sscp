@@ -45,9 +45,11 @@ SSCP_CONNECT=${SSCP_CONNECT:-vagrant@127.0.0.1}
 # Default temp directory. It uses in a remote server as well
 SSCP_TEMP=${SSCP_TEMP:-'~'}
 # disable using colors
-SSCP_NO_COLOR=${SSCP_NO_COLOR:-}
+SSCP_NO_COLOR=${SSCP_NO_COLOR:-0}
 # verbose level
 sscp_verbose=${SSCP_VERBOSE:-${VERBOSE}}
+
+connect=${connect:-${SSCP_CONNECT}}
 
 if [ '1' == "${SSCP_NO_COLOR}" ]; then
   t_red=''
@@ -63,7 +65,7 @@ t_OK=${t_green}'OK'${t_reset}
 
 show_help () {
     cat << EOF
-SSCP Shell Tool v0.4.0
+SSCP Shell Tool v0.5.0
 Fast downloader/deployer for remote servers.
 It archives files by using tar and transports them using by SCP. So, just pack and transfer.
 All commands run by using SSH connection.
@@ -71,20 +73,33 @@ All commands run by using SSH connection.
 Base format:
   $ sscp ACTION SOURCE_PATH TARGET_PATH
 
+ACTIONS
+
+UPLOAD or DOWNLOAD
 Upload/download format:
   $ sscp upload|U|download|D SOURCE_PATH TARGET_PATH \\
     [OPTIONS]
       LOCAL_PATH  Local path to directory or file to upload onto a remote server.
       REMOTE_PATH Remote path to directory where packed file/s should be extracted.
 
+TEST
 Test connection:
   $ sscp test
   OK
 
-Show path to config (if file was found):
+SHOW CONFIG-FILE
+Show path to config (if file was found) which is going to be used:
   $ sscp config-file
   /home/my-user/.sscprc
 
+SHOW SSH CONNECTION
+Show connection string:
+  $ sscp show-ssh-connection
+  OR
+  $ sscp ssh-connection
+  ssh myuser@localhost -p 2222
+
+SHOW ENV VARS
 Show external environment SSCP_* variables
   $ sscp show-vars
   OR
@@ -109,7 +124,7 @@ Download file or directory from remote server. Command:
               If this argument is omitted made archive will be placed into
               a current directory.
 
-OPTIONS
+OPTIONS FOR DEPLOYMENT
   -p|--port PORT
               Define custom connection port.
               Default: 2222
@@ -190,17 +205,6 @@ put_printf () {
 
 read_params () {
   # Process args
-
-  # Default values
-  tar_options=''
-  action_type=''
-  path1=''
-  path2=''
-  port=''
-
-  use_vcs=0
-  exclude_on=1
-  create_target_path=0
 
   # Read arguments
   i=0
@@ -304,8 +308,24 @@ define_exclude_options() {
   echo ${exclude}
 }
 
-# Init connection configuration
-init_connection() {
+load_config () {
+  # Default values
+  tar_options=''
+  action_type=''
+  path1=''
+  path2=''
+  port=''
+
+  use_vcs=0
+  exclude_on=1
+  create_target_path=0
+
+  ssh_connect=''
+  scp_connect=''
+  remote_base_dir=''
+  local_base_dir=''
+  # EOB Default values
+
   config_filename=${SSCP_RC}
   config_file=''
   if [ -f ${PWD}/${config_filename} ]; then
@@ -313,15 +333,14 @@ init_connection() {
   elif [ -f ${SSCP_BASE_DIR}/${config_filename} ]; then
     config_file=${SSCP_BASE_DIR}"/${config_filename}"
   fi
-  ssh_connect=''
-  scp_connect=''
-  connect=${connect:-${SSCP_CONNECT}}
-  remote_base_dir=''
-  local_base_dir=''
+
   if [ -n "${config_file}" ]; then
     . "${config_file}"
   fi
+}
 
+# Init connection configuration
+init_connection() {
   if [ -z "${ssh_connect}" ]; then
     ssh_connect="${SSCP_SSH_BIN} ${connect}"
     if [ -n "${port:-}" ]; then
@@ -338,7 +357,7 @@ init_connection() {
 }
 
 test_connection() {
-  ${ssh_connect} -C 'pwd > /dev/null' && put_echo 'OK'
+  ${ssh_connect} -C 'cd > /dev/null' && put_echo 'OK'
 }
 
 deploy_target() {
@@ -471,6 +490,9 @@ download_target() {
 }
 
 process_deployment() {
+  # Load configuration from .sscprc file.
+  load_config
+
   # Init passed params
   read_params $@
 
@@ -503,7 +525,7 @@ SSCP_EXCLUDE=${SSCP_EXCLUDE}
 SSCP_CONNECT=${SSCP_CONNECT}
 SSCP_TEMP=${SSCP_TEMP}
 SSCP_NO_COLOR=${SSCP_NO_COLOR}
-SSCP_VERBOSE=${sscp_verbose}
+SSCP_VERBOSE=${SSCP_VERBOSE:-}
 EOF
     return
   fi
