@@ -23,16 +23,27 @@ $ sscp --help
 ```
 
 ## Global environment variables
-Global vars:
-- `SSCP_RC=.sscprc`     - Global resource file
-- `SSCP_SSH_BIN=ssh`    - SSH bin file
-- `SSCP_SCP_BIN=scp`    - SCP bin file
-- `SSCP_EXCLUDE=.idea`  - Custom exclude list.
-- `SSCP_TEMP=~`         - Temp directory for archive. It uses for remote servers.
-- `SSCP_CONNECT=.vagrant@127.0.0.1`
-                        - Connection host and user.
-- `SSCP_NO_COLOR=1`     - Disable colors in output.
-- `SSCP_SILENT=1`       - Disable `stdout` output.
+```
+$ sscp vars
+# default name of config file
+SSCP_RC=.sscprc
+# directory where base .sscprc file (your home directory)
+SSCP_BASE_DIR=/root
+# SSH binary file
+SSCP_SSH_BIN=ssh
+# SCP binary file
+SSCP_SCP_BIN=scp
+# Default exclude list
+SSCP_EXCLUDE=.idea
+# Default connection
+SSCP_CONNECT=vagrant@127.0.0.1
+# Default temp directory. It uses in a remote server as well
+SSCP_TEMP=~
+# disable using colors
+SSCP_NO_COLOR=0
+# default verbose level (0- silent, 1- normal, 2- "very" mode, 3- debug)
+SSCP_VERBOSE=1
+```
 
 You may print allowed environment variables:
 ```
