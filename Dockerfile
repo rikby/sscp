@@ -3,7 +3,7 @@ FROM centos:7
 #Add repos
 RUN  rpm -U https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
 
-RUN yum update && yum install -y  \
+RUN yum -y update && yum install -y  \
   sudo \
   openssh-clients \
   openssh-server \

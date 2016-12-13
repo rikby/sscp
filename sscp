@@ -24,7 +24,12 @@ ERR_FATAL=1
 ERR_LOGIC=2
 ERR_PARAMS=3
 ERR_FILE_SYSTEM=4
-readonly ERR_FATAL ERR_LOGIC ERR_PARAMS ERR_FILE_SYSTEM
+VERBOSE_OFF=0
+VERBOSE=1
+VERBOSE_VERY=2
+VERBOSE_DEBUG=3
+readonly ERR_FATAL ERR_LOGIC ERR_PARAMS ERR_FILE_SYSTEM \
+          VERBOSE VERBOSE_VERY VERBOSE_OFF VERBOSE_DEBUG
 
 SSCP_RC=${SSCP_RC:-.sscprc}
 # directory where base .sscprc file
@@ -41,8 +46,8 @@ SSCP_CONNECT=${SSCP_CONNECT:-vagrant@127.0.0.1}
 SSCP_TEMP=${SSCP_TEMP:-'~'}
 # disable using colors
 SSCP_NO_COLOR=${SSCP_NO_COLOR:-}
-# disable using colors
-sscp_silent=${SSCP_SILENT:-0}
+# verbose level
+sscp_verbose=${SSCP_VERBOSE:-${VERBOSE}}
 
 if [ '1' == "${SSCP_NO_COLOR}" ]; then
   t_red=''
@@ -112,7 +117,9 @@ OPTIONS
               Include VCS file into transition archives.
               It excludes .idea files and VCS. This option will disable
               excluding VCS files.
-  -s|silent   Disable output.
+  -s|--silent   Disable output.
+  -v|--verbose  Set "very" verbose mode.
+  -D|--debug  Set "debug" verbose mode.
   -H|--host HOST
               Connection host. It can be passed with a username.
               root@example.com
@@ -151,14 +158,33 @@ check_error () {
   fi
 }
 
+# put_echo 'My text'
+# or
+# put_echo ${VERBOSE_VERY} 'My text'
 put_echo () {
-  [[ "${sscp_silent}" -ne '1' ]] && echo -e ${@}
+  if [[ "${1}" =~ ^[0-3]$ ]]; then
+    mode=${1}
+    shift
+  else
+    mode=${VERBOSE}
+  fi
+  if [ "${sscp_verbose}" -ge "${mode}" ]; then
+    echo -e ${@}
+  fi
   return 0
 }
 put_printf () {
+  if [[ "${1}" =~ ^[0-3]$ ]]; then
+    mode=${1}
+    shift
+  else
+    mode=${VERBOSE}
+  fi
   local format=${1}
   shift
-  [[ "${sscp_silent}" -ne '1' ]] && printf "${format}" ${@}
+  if [ "${sscp_verbose}" -ge "${mode}" ]; then
+    printf "${format}" ${@}
+  fi
   return 0
 }
 
@@ -206,7 +232,7 @@ read_params () {
 
   # Process options
   # validate and redefine options
-  OPTS=`getopt -o gp:hH:cs -l use-vcs,port:,help,host:,create-destination,silent -- "$@"`
+  OPTS=`getopt -o gp:hH:csD -l use-vcs,port:,help,host:,create-destination,silent,debug -- "$@"`
   eval set -- "${OPTS}"
 
   while true; do
@@ -224,7 +250,16 @@ read_params () {
         shift
         ;;
       -s|--silent)
-        sscp_silent=1
+        sscp_verbose=${VERBOSE_OFF}
+        shift
+        ;;
+      -v|--verbose)
+        sscp_verbose=${VERBOSE_VERY}
+        shift
+        ;;
+      -D|--debug)
+        sscp_verbose=${VERBOSE_DEBUG}
+        sscp_verbose=3
         shift
         ;;
       -p|--port)
@@ -456,7 +491,7 @@ process_deployment() {
     echo ${config_file}
     return
   elif [[ "${action_type}" =~ ^(show-)?ssh-connection$ ]]; then
-    echo ${ssh_connect}.
+    echo ${ssh_connect}
     return
   elif [[ "${action_type}" =~ ^(show-)?vars$ ]]; then
     cat << EOF
@@ -468,7 +503,7 @@ SSCP_EXCLUDE=${SSCP_EXCLUDE}
 SSCP_CONNECT=${SSCP_CONNECT}
 SSCP_TEMP=${SSCP_TEMP}
 SSCP_NO_COLOR=${SSCP_NO_COLOR}
-SSCP_SILENT=${sscp_silent}
+SSCP_VERBOSE=${sscp_verbose}
 EOF
     return
   fi

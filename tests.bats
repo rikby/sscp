@@ -45,14 +45,13 @@ output=''
 }
 
 @test "Test --host with silent mode" {
-  export SSCP_SILENT=1
-  run sscp test --host localhost
+  run sscp test --host localhost --silent
   [ "${output}" == '' ]
   [ ${status} == 0 ]
 }
 
-@test "Test --host with using SSCP_SILENT" {
-  export SSCP_SILENT=1
+@test "Test --host with using SSCP_VERBOSE" {
+  export SSCP_VERBOSE=0
   run sscp test --host localhost
   [ "${output}" == '' ]
   [ ${status} == 0 ]
