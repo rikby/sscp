@@ -94,9 +94,9 @@ Show path to config (if file was found) which is going to be used:
 
 SHOW SSH CONNECTION
 Show connection string:
-  $ sscp show-ssh-connection
-  OR
   $ sscp ssh-connection
+  OR
+  $ sscp show-ssh-connection
   ssh myuser@localhost -p 2222
 
 SHOW ENV VARS
