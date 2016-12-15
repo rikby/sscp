@@ -24,6 +24,7 @@ ERR_FATAL=1
 ERR_LOGIC=2
 ERR_PARAMS=3
 ERR_FILE_SYSTEM=4
+ERR_CONNECTION=6 # failed test for connection
 VERBOSE_OFF=0
 VERBOSE=1
 VERBOSE_VERY=2
@@ -48,6 +49,7 @@ SSCP_TEMP=${SSCP_TEMP:-'~'}
 SSCP_NO_COLOR=${SSCP_NO_COLOR:-0}
 # verbose level
 SSCP_VERBOSE=${SSCP_VERBOSE:-${VERBOSE}}
+SSCP_NEW_HOST_RESET_PORT=${SSCP_NEW_HOST_RESET_PORT:-1}
 sscp_verbose=${SSCP_VERBOSE}
 
 if [ "${VERBOSE_DEBUG}" -eq "${SSCP_VERBOSE}" ]; then
@@ -246,6 +248,9 @@ read_params () {
   OPTS=`getopt -o gp:hH:csD -l use-vcs,port:,help,host:,create-destination,verbose,debug -- "$@"`
   eval set -- "${OPTS}"
 
+  orig_port=${port}
+  orig_host=$(echo ${connect} | grep -oE '[^@]+$')
+
   while true; do
     case "${1}" in
       -g|--use-vcs)
@@ -299,6 +304,14 @@ read_params () {
         ;;
     esac
   done
+
+  # drop default port if hostname has been changed
+  if [ '1' == "${SSCP_NEW_HOST_RESET_PORT}" ] \
+    && [ "${orig_port}" == "${port}" ] \
+    && [ "${orig_host}" != "$(echo ${connect} | grep -oE '[^@]+$')" ]
+  then
+    port=''
+  fi
 
   rest_options=$@
 }
@@ -364,11 +377,11 @@ init_connection() {
 }
 
 test_connection() {
-  ${ssh_connect} -C 'cd > /dev/null' && put_echo 'OK'
+  ${ssh_connect} -C 'cd > /dev/null' && put_echo 'OK' || check_error ${ERR_CONNECTION} "Cannot connect to the server (${connect} ${port})."
 }
 
 deploy_target() {
-  test_connection 1> /dev/null
+  test_connection > /dev/null
 
   # validate params
   if [ -z "${path1:-}" ]; then
@@ -533,7 +546,7 @@ process_deployment() {
   init_connection
 
   if [ "${action_type}" == 'test' ]; then
-    test_connection || check_error ${ERR_FATAL} "Cannot connect to the server (${connect} ${port})."
+    test_connection
     return
   elif [ "${action_type}" == 'config-file' ]; then
     echo ${config_file}
@@ -564,6 +577,8 @@ SSCP_TEMP=${SSCP_TEMP}
 SSCP_NO_COLOR=${SSCP_NO_COLOR}
 # default verbose level (0- silent, 1- normal, 2- "very" mode, 3- debug)
 SSCP_VERBOSE=${SSCP_VERBOSE}
+# if default host has been changed drop port as well
+SSCP_NEW_HOST_RESET_PORT=${SSCP_NEW_HOST_RESET_PORT}
 EOF
     return
   fi
