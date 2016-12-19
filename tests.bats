@@ -2,6 +2,12 @@
 # Run tests by using bats
 # https://github.com/sstephenson/bats
 
+ERR_FATAL=1
+ERR_LOGIC=2
+ERR_PARAMS=3
+ERR_FILE_SYSTEM=4
+ERR_CONNECTION=6 # failed test for connection
+
 status=0
 output=''
 @test "Single run." {
@@ -133,7 +139,7 @@ EOF
   export SSCP_NO_COLOR=1
   run sscp test --host localhost --port 1234
 
-  [ "${status}" -eq 1 ]
+  [ "${status}" -eq ${ERR_CONNECTION} ]
   [[ 'error: Cannot connect to the server (localhost 1234).' =~ "${output}" ]]
 }
 
@@ -147,7 +153,7 @@ EOF
   export SSCP_NO_COLOR=1
   run sscp test
 
-  [ "${status}" -eq 1 ]
+  [ "${status}" -eq ${ERR_CONNECTION} ]
   [[ 'error: Cannot connect to the server (localhost 9999).' =~ "${output}" ]]
 }
 
