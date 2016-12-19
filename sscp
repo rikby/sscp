@@ -478,7 +478,10 @@ download_target() {
     source_dir=${path1}
   else
     # relative remote path
-    source_dir=${remote_base_dir}/${path1}
+    source_dir=${remote_base_dir}
+    if [ '.' != "${path1:-.}" ]; then
+      source_dir+="/${path1}"
+    fi
   fi
   if [ "${path2::1}" == '/' ] || [ -z "${local_base_dir}" ]; then
     # absolute remote path
@@ -489,6 +492,10 @@ download_target() {
     if [ '.' != "${path2}" ]; then
       target_dir+="/${path2}"
     fi
+  elif [ -z "${path1}" ] && [ -z "${path2}" ] && [ -n "${local_base_dir}" ]; then
+    target_dir=${local_base_dir}
+  else
+    check_error ${ERR_LOGIC} "Cannot determine target path."
   fi
 
   if ${ssh_connect} "test -d ${source_dir}"; then
@@ -621,7 +628,7 @@ EOF
     return
   fi
 
-  exclude=$(define_exclude_options ${path1})
+  exclude=$(define_exclude_options ${path1:-.})
 
   if [ "${action_type}" == 'upload' ]; then
     deploy_target

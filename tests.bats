@@ -338,3 +338,31 @@ EOF
 
   [[ "${expected}" == "${result}" ]]
 }
+
+@test "Test download root with predefined paths but without params." {
+  rm -rf /tmp/sscp-bats-tests/tuser-target \
+    /tmp/sscp-bats-tests/tuser \
+    /tmp/sscp-bats-tests/some
+  mkdir -p /tmp/sscp-bats-tests/some
+  cd /tmp/sscp-bats-tests/some
+  cat <<- EOF > .sscprc
+connect='localhost'
+port=22
+remote_base_dir='/tmp/sscp-bats-tests/tuser'
+local_base_dir='/tmp/sscp-bats-tests/tuser-target'
+EOF
+
+  mkdir -p /tmp/sscp-bats-tests/tuser
+  mkdir -p /tmp/sscp-bats-tests/tuser-target
+
+  touch /tmp/sscp-bats-tests/tuser/file1
+
+  run sscp D
+
+  [ "${status}" -eq 0 ]
+
+  expected='./file1'
+  result=$(cd /tmp/sscp-bats-tests/tuser-target; find . -type f)
+
+  [[ "${expected}" == "${result}" ]]
+}
