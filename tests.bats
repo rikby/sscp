@@ -339,7 +339,7 @@ EOF
   [[ "${expected}" == "${result}" ]]
 }
 
-@test "Test download root with predefined paths but without params." {
+@test "Test download root predefined path without 'path' params." {
   rm -rf /tmp/sscp-bats-tests/tuser-target \
     /tmp/sscp-bats-tests/tuser \
     /tmp/sscp-bats-tests/some
@@ -362,6 +362,26 @@ EOF
   [ "${status}" -eq 0 ]
 
   expected='./file1'
+  result=$(cd /tmp/sscp-bats-tests/tuser-target; find . -type f)
+
+  [[ "${expected}" == "${result}" ]]
+}
+
+@test "Test download archive." {
+  rm -rf /tmp/sscp-bats-tests/tuser-target \
+    /tmp/sscp-bats-tests/tuser
+
+  mkdir -p /tmp/sscp-bats-tests/tuser
+  mkdir -p /tmp/sscp-bats-tests/tuser-target
+
+  touch /tmp/sscp-bats-tests/tuser/file1
+
+  cd /tmp/sscp-bats-tests/tuser-target
+  run sscp D /tmp/sscp-bats-tests/tuser --host localhost
+
+  [ "${status}" -eq 0 ]
+
+  expected=$(printf "./tuser.tar.gz")
   result=$(cd /tmp/sscp-bats-tests/tuser-target; find . -type f)
 
   [[ "${expected}" == "${result}" ]]
