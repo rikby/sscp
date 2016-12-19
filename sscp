@@ -74,7 +74,7 @@ t_OK=${t_green}'OK'${t_reset}
 
 show_help () {
     cat << EOF
-SSCP Shell Tool v0.5.0
+SSCP Shell Tool v0.8.0
 Fast downloader/deployer for remote servers.
 It archives files by using tar and transports them using by SCP. So, just pack and transfer.
 All commands run by using SSH connection.
