@@ -245,7 +245,18 @@ read_params () {
 
   # Process options
   # validate and redefine options
-  OPTS=`getopt -o gp:hH:csD -l use-vcs,port:,help,host:,create-destination,verbose,debug -- "$@"`
+  declare -A options
+  options=(
+    [g]=use-vcs
+    [p:]=port:
+    [h]=help
+    [H:]=host:
+    [c]=create-destination
+    [s]=silent
+    [v]=verbose
+    [D]=debug
+  )
+  OPTS=`getopt -o $(echo ${!options[*]} | tr -d ' ') -l $(echo ${options[*]} | tr ' ' ',') -- "$@"`
   eval set -- "${OPTS}"
 
   orig_port=${port}
