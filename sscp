@@ -329,10 +329,10 @@ read_params () {
 
 define_exclude_options() {
   local exclude=''
-  local path=${1}
+  local source_path=${1}
   if [ 1 == ${exclude_on} ]; then
     exclude='--exclude='${SSCP_EXCLUDE}
-    if [ 0 == ${use_vcs} ] && [[ ! "${path1}" =~ \.git[^/]*$ ]]; then
+    if [ 0 == ${use_vcs} ] && [[ ! "${source_path}" =~ \.git[^/]*$ ]]; then
       exclude+=' --exclude-vcs'
     fi
   fi
@@ -407,7 +407,10 @@ deploy_target() {
     target_dir=${path2}
   elif [ -n "${remote_base_dir}" ]; then
     # relative remote path
-    target_dir=${remote_base_dir}/${path2}
+    target_dir=${remote_base_dir}
+    if [ '.' != "${path2}" ]; then
+      target_dir+="/${path2}"
+    fi
   else
     # relative remote path
     target_dir=${path2}
@@ -430,7 +433,7 @@ deploy_target() {
     source_path=${path1}
     source_dir=${path1}
   elif [ -n  "${local_base_dir}" ] && [ -f ${local_base_dir}/${path1} ]; then
-    upload_type='d'
+    upload_type='f'
     source_path=${local_base_dir}/${path1}
     source_dir=$(dirname ${local_base_dir}/${path1})
   elif [ -n  "${local_base_dir}" ] && [ -d ${local_base_dir}/${path1} ]; then
@@ -446,9 +449,9 @@ deploy_target() {
     put_printf "Packing file/s..."
     rm -f $(basename ${source_path}).tar.gz
     if [ ${upload_type} = 'd' ]; then
-      tar czf $(basename ${source_path}).tar.gz -C ${source_path} . ${exclude} ${rest_options}
+      tar czf $(basename ${source_path}).tar.gz -C ${source_dir} . ${exclude} ${rest_options}
     else
-      tar czf $(basename ${source_path}).tar.gz ${source_path} ${exclude} ${rest_options}
+      tar czf $(basename ${source_path}).tar.gz -C ${source_dir} $(basename ${source_path}) ${exclude} ${rest_options}
     fi
     put_echo "${t_OK}"
 
@@ -469,36 +472,60 @@ deploy_target() {
 }
 
 download_target() {
-  # validate params
-  ${ssh_connect} "ls -la ${path1} > /dev/null 2>&1"
-  check_error $? "Path does '${path1}' not exist."
-  if [ -n "${path2}" ] && [ ! -d "${path2}" ]; then
-    check_error ${ERR_FILE_SYSTEM} "No such directory '${path2}'."
+  # add defined base directories
+  if [ "${path1::1}" == '/' ] ||  [ -z "${remote_base_dir}" ]; then
+    # absolute remote path
+    source_dir=${path1}
+  else
+    # relative remote path
+    source_dir=${remote_base_dir}/${path1}
+  fi
+  if [ "${path2::1}" == '/' ] || [ -z "${local_base_dir}" ]; then
+    # absolute remote path
+    target_dir=${path2}
+  elif [ -n "${path2}" ]; then
+    # relative remote path
+    target_dir=${local_base_dir}
+    if [ '.' != "${path2}" ]; then
+      target_dir+="/${path2}"
+    fi
   fi
 
-  target_type=$(${ssh_connect} "[ -d ${path1} ] && echo d || echo f")
+  if ${ssh_connect} "test -d ${source_dir}"; then
+    target_type='d'
+  elif ${ssh_connect} "test -f ${source_dir}"; then
+    target_type='f'
+  else
+    check_error ${ERR_FILE_SYSTEM} "Path '${source_dir}' does not exist."
+  fi
 
   if [ ${target_type} == 'f' ]; then
-    target_basename=$(basename "${path1}")
+    target_basename=$(basename "${source_dir}")
     target_to_archive=''
-    download_file=${path1}
-    if [[ ! "${target_basename}" =~ \.(tar|gz) ]]; then
+    download_file=${source_dir}
+    if [[ ! "${target_basename}" =~ \.(tar|gz)$ ]]; then
       # ignore packing archives
-      target_to_archive=$(basename "${path1}")
+      target_to_archive=$(basename "${source_dir}")
     fi
-    target_dir=$(dirname "${path1}")
+    source_dir=$(dirname "${source_dir}")
   else
-    target_basename=$( basename "${path1}" )
+    target_basename=$( basename "${source_dir}" )
     target_to_archive='.'
-    target_dir=${path1}
   fi
 
-  put_printf "local:${t_green}${path2:-./${target_basename}.tar.gz}${t_reset} <= remote:${t_green}${target_dir}/${target_to_archive}${t_reset}\n"
+  # validate params
+  ${ssh_connect} "ls -la ${source_dir} > /dev/null 2>&1"
+  check_error $? "Path '${source_dir}' does not exist."
+  if [ -n "${target_dir}" ] && [ ! -d "${target_dir}" ]; then
+    check_error ${ERR_FILE_SYSTEM} "No such directory '${target_dir}'."
+  fi
+
+  put_printf "local:${t_green}${target_dir:-./${target_basename}.tar.gz}${t_reset} <= remote:${t_green}${source_dir}/${target_to_archive}${t_reset}\n"
   if [ -n "${target_to_archive}" ]; then
     put_printf "Packing file/s..."
     download_file="${SSCP_TEMP}/${target_basename}.tar.gz"
     ${ssh_connect} "rm -f ${download_file}" # clean up
-    ${ssh_connect} "tar cf ${download_file} -C ${target_dir} ${target_to_archive} ${exclude} ${rest_options}"
+    ${ssh_connect} "tar cf ${download_file} -C ${source_dir} ${target_to_archive} ${exclude} ${rest_options}"
     put_echo "${t_OK}"
   fi
 
@@ -510,9 +537,9 @@ download_target() {
   fi
   put_echo "${t_OK}"
 
-  if [ -n "${path2}" ]; then
+  if [ -n "${target_dir}" ]; then
     put_printf "Unpacking archive..."
-    tar xf ./${target_basename}.tar.gz -C ${path2}
+    tar xf ./${target_basename}.tar.gz -C ${target_dir}
     put_echo "${t_OK}"
     rm -f ./${target_basename}.tar.gz
   else
