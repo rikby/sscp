@@ -394,26 +394,23 @@ test_connection() {
 deploy_target() {
   test_connection > /dev/null
 
-  # validate params
-  if [ -z "${path1:-}" ]; then
-    check_error ${ERR_PARAMS} 'Empty TARGET_PATH argument.'
-  fi
-  if [ -z "${path2:-}" ]; then
-    check_error ${ERR_PARAMS} 'Empty SOURCE_PATH argument.'
-  fi
-
   if [ "${path2::1}" == '/' ]; then
     # absolute remote path
     target_dir=${path2}
   elif [ -n "${remote_base_dir}" ]; then
     # relative remote path
     target_dir=${remote_base_dir}
-    if [ '.' != "${path2}" ]; then
+    if [ '.' != "${path2:-.}" ]; then
       target_dir+="/${path2}"
     fi
   else
     # relative remote path
     target_dir=${path2}
+  fi
+
+  # validate target dir
+  if [ -z "${target_dir}" ]; then
+    check_error ${ERR_FILE_SYSTEM} "error: Could not determine target path: '${target_dir}'."
   fi
 
   if [ 0 == ${create_target_path} ] && [ 0 == $(${ssh_connect} "ls -la ${target_dir} > /dev/null 2>&1 && echo 1 || echo 0") ]; then
@@ -424,15 +421,19 @@ deploy_target() {
     check_error ${ERR_FILE_SYSTEM} "Could not create remote target directory '${target_dir}'."
   fi
 
-  if [ -f ${path1} ]; then
+  if [ -f "${path1}" ]; then
     upload_type='f'
     source_path=${path1}
     source_dir=$(dirname ${path1})
-  elif [ -d ${path1} ]; then
+  elif [ -d "${path1}" ]; then
     upload_type='d'
     source_path=${path1}
     source_dir=${path1}
-  elif [ -n  "${local_base_dir}" ] && [ -f ${local_base_dir}/${path1} ]; then
+  elif [ -n  "${local_base_dir}" ] && [ -z "${path1}" ] && [ -z "${path2}" ]; then
+    upload_type='d'
+    source_path=${local_base_dir}
+    source_dir=${local_base_dir}
+  elif [ -n "${local_base_dir}" ] && [ -f ${local_base_dir}/${path1} ]; then
     upload_type='f'
     source_path=${local_base_dir}/${path1}
     source_dir=$(dirname ${local_base_dir}/${path1})
@@ -441,7 +442,7 @@ deploy_target() {
     source_path=${local_base_dir}/${path1}
     source_dir=${local_base_dir}/${path1}
   else
-    check_error ${ERR_FILE_SYSTEM} "error: Could not find source '${path1}'"
+    check_error ${ERR_FILE_SYSTEM} "error: Could not determine source path: '${path1}'."
   fi
 
   put_printf "local:${t_green}${source_path}${t_reset} => remote:${t_green}${target_dir}${t_reset}\n"
