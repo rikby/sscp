@@ -44,7 +44,7 @@ SSCP_EXCLUDE=${SSCP_EXCLUDE:-.idea}
 # Default connection
 SSCP_CONNECT=${SSCP_CONNECT:-vagrant@127.0.0.1}
 # Default temp directory. It uses in a remote server as well
-SSCP_TEMP=${SSCP_TEMP:-'~'}
+SSCP_TEMP=${SSCP_TEMP:-'/tmp'}
 # disable using colors
 SSCP_NO_COLOR=${SSCP_NO_COLOR:-0}
 # verbose level
@@ -63,10 +63,12 @@ connect=${connect:-${SSCP_CONNECT}}
 if [ '1' == "${SSCP_NO_COLOR}" ]; then
   t_red=''
   t_green=''
+  t_yellow=''
   t_reset=''
 else
   t_red='\e[0;31m'
   t_green='\e[0;32m'
+  t_yellow='\e[0;33m'
   t_reset='\e[0m'
 fi
 # Green "OK"
@@ -192,8 +194,16 @@ put_echo () {
   else
     mode=${VERBOSE}
   fi
+
+  local prefix=''
+  if [[ ${VERBOSE_VERY} -eq ${mode} ]]; then
+    prefix="${t_yellow}verbose:${t_reset} "
+  elif [[ ${VERBOSE_DEBUG} -eq ${mode} ]]; then
+    prefix="${t_yellow}debug:${t_reset} "
+  fi
+
   if [ "${sscp_verbose}" -ge "${mode}" ]; then
-    echo -e ${@}
+    echo -e ${prefix}${@}
   fi
   return 0
 }
@@ -206,8 +216,16 @@ put_printf () {
   fi
   local format=${1}
   shift
+
+  local prefix=''
+  if [[ ${VERBOSE_VERY} -eq ${mode} ]]; then
+    prefix="${t_yellow}verbose:${t_reset} "
+  elif [[ ${VERBOSE_DEBUG} -eq ${mode} ]]; then
+    prefix="${t_yellow}debug:${t_reset} "
+  fi
+
   if [ "${sscp_verbose}" -ge "${mode}" ]; then
-    printf "${format}" ${@}
+    printf "${prefix}${format}" ${@}
   fi
   return 0
 }
@@ -445,29 +463,50 @@ deploy_target() {
     check_error ${ERR_FILE_SYSTEM} "error: Could not determine source path: '${path1}'."
   fi
 
-  put_printf "local:${t_green}${source_path}${t_reset} => remote:${t_green}${target_dir}${t_reset}\n"
+  put_printf "local:${t_green}%s${t_reset} => remote:${t_green}%s${t_reset}\n" "${source_path}" "${target_dir}"
   if [ ${upload_type} = 'd' ] || [[ ! ${source_path} =~ .*\.tar\.gz$ ]]; then
-    put_printf "Packing file/s..."
-    rm -f $(basename ${source_path}).tar.gz
-    if [ ${upload_type} = 'd' ]; then
-      tar czf $(basename ${source_path}).tar.gz -C ${source_dir} . ${exclude} ${rest_options}
-    else
-      tar czf $(basename ${source_path}).tar.gz -C ${source_dir} $(basename ${source_path}) ${exclude} ${rest_options}
-    fi
-    put_echo "${t_OK}"
+    put_printf 'Packing file/s...'
 
     source_archive=$(basename ${source_path}).tar.gz
+    if [ "${SSCP_TEMP}" == '~' ]; then
+      tmp=$(cd; pwd)
+    else
+      tmp=${SSCP_TEMP}
+    fi
+    source_archive_deploy=${tmp}/${source_archive}
+
+    # remove previous archive
+    rm -f ${source_archive_deploy}
+
+    if [ ${upload_type} = 'd' ]; then
+      put_echo ${VERBOSE_VERY} 'Deploy directory mode.'
+      tar czf ${source_archive_deploy} -C ${source_dir} . ${exclude} ${rest_options}
+    else
+      put_echo ${VERBOSE_VERY} 'Deploy single file mode.'
+      tar czf ${source_archive_deploy} -C ${source_dir} $(basename ${source_path}) ${exclude} ${rest_options}
+    fi
+    put_echo "${t_OK}"
+    archive_created=1
   else
+    put_echo ${VERBOSE_VERY} 'Deploy archive mode.'
+    archive_created=0
     source_archive=$(basename ${source_path})
+    source_archive_deploy=${source_path}
   fi
 
   put_printf "Uploading archive..."
-  ${scp_connect} ${source_archive} ${connect}:${target_dir} && rm -f ${source_archive}
+  ${scp_connect} ${source_archive_deploy} ${connect}:${target_dir}
   check_error $? 'Cannot upload archive.'
+  if [ '1' == "${archive_created}" ]; then
+    put_echo ${VERBOSE_VERY} 'Removing archive "'${source_archive_deploy}'"...'
+    rm -f ${source_archive_deploy}
+  else
+    put_echo ${VERBOSE_DEBUG} 'Original archive "'${source_archive_deploy}'" is not removed.'
+  fi
   put_echo "Uploading archive...${t_OK}"
 
   put_printf "Unpacking archive..."
-  ${ssh_connect} "cd ${target_dir} && tar xzfm ${source_archive} && rm -f ${source_archive}"
+  ${ssh_connect} "cd ${target_dir} && tar xfm ${source_archive} && rm -f ${source_archive}"
   check_error $? 'Cannot unpack archive.'
   put_echo "${t_OK}"
 }
@@ -533,7 +572,7 @@ download_target() {
     put_printf "Packing file/s..."
     download_file="${SSCP_TEMP}/${target_basename}.tar.gz"
     ${ssh_connect} "rm -f ${download_file}" # clean up
-    ${ssh_connect} "tar cf ${download_file} -C ${source_dir} ${target_to_archive} ${exclude} ${rest_options}"
+    ${ssh_connect} "tar czf ${download_file} -C ${source_dir} ${target_to_archive} ${exclude} ${rest_options}"
     put_echo "${t_OK}"
   fi
 

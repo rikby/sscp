@@ -414,3 +414,23 @@ EOF
 
   [[ "${expected}" == "${result}" ]]
 }
+
+@test "Test deploy and unpack ready archive." {
+  rm -rf /tmp/sscp-bats-tests/tuser-target \
+    /tmp/sscp-bats-tests/tuser
+
+  mkdir -p /tmp/sscp-bats-tests/tuser
+  mkdir -p /tmp/sscp-bats-tests/tuser-target
+
+  touch /tmp/sscp-bats-tests/tuser/file1
+  tar czf /tmp/sscp-bats-tests/ar.tar.gz -C /tmp/sscp-bats-tests/tuser .
+
+  run sscp U /tmp/sscp-bats-tests/ar.tar.gz /tmp/sscp-bats-tests/tuser-target --host root@localhost
+
+  [ "${status}" -eq 0 ]
+
+  expected=$(printf "./file1")
+  result=$(cd /tmp/sscp-bats-tests/tuser-target; find . -type f)
+
+  [[ "${expected}" == "${result}" ]]
+}
