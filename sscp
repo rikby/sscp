@@ -44,7 +44,7 @@ SSCP_EXCLUDE=${SSCP_EXCLUDE:-.idea}
 # Default connection
 SSCP_CONNECT=${SSCP_CONNECT:-vagrant@127.0.0.1}
 # Default temp directory. It uses in a remote server as well
-SSCP_TEMP=${SSCP_TEMP:-'/tmp'}
+SSCP_TEMP=${SSCP_TEMP:-'~'}
 # disable using colors
 SSCP_NO_COLOR=${SSCP_NO_COLOR:-0}
 # verbose level
@@ -153,6 +153,7 @@ OPTIONS FOR DEPLOYMENT
               Ignore all default excluding.
   -c|--create-destination
               Create destination path automatically.
+  -u|--unpack Unpack downloaded archive automatically in case when archive was created before transferring.
   -h|--help   Show this help
 
 CONNECTION PARAMETERS
@@ -273,6 +274,7 @@ read_params () {
     [s]=silent
     [v]=verbose
     [D]=debug
+    [u]=unpack
   )
   OPTS=`getopt -o $(echo ${!options[*]} | tr -d ' ') -l $(echo ${options[*]} | tr ' ' ',') -- "$@"`
   eval set -- "${OPTS}"
@@ -304,7 +306,10 @@ read_params () {
         ;;
       -D|--debug)
         sscp_verbose=${VERBOSE_DEBUG}
-        sscp_verbose=3
+        shift
+        ;;
+      -u|--unpack)
+        unpack_automatically=1
         shift
         ;;
       -p|--port)
@@ -328,8 +333,7 @@ read_params () {
         break
         ;;
       *)
-        echo "${0}: unparseable option ${1}."
-        exit ${ERR_PARAMS}
+        check_error ${ERR_PARAMS} "${0}: unparseable option ${1}."
         ;;
     esac
   done
@@ -368,6 +372,7 @@ load_config () {
   use_vcs=0
   exclude_on=1
   create_target_path=0
+  unpack_automatically=0
 
   ssh_connect=''
   scp_connect=''
@@ -511,10 +516,14 @@ deploy_target() {
   fi
   put_echo "Uploading archive...${t_OK}"
 
-  put_printf "Unpacking archive..."
-  ${ssh_connect} "cd ${target_dir} && tar xfm ${source_archive} && rm -f ${source_archive}"
-  check_error $? 'Cannot unpack archive.'
-  put_echo "${t_OK}"
+  if [ '1' == "${archive_created}" ] || [ ${unpack_automatically} == 1 ]; then
+    put_printf "Unpacking archive..."
+    ${ssh_connect} "cd ${target_dir} && tar xfm ${source_archive} && rm -f ${source_archive}"
+    check_error $? 'Cannot unpack archive.'
+    put_echo "${t_OK}"
+  elif [ -n ${target_dir} ]; then
+    put_echo 'Uploaded file: '${target_dir}/${source_archive}
+  fi
 }
 
 download_target() {
@@ -556,6 +565,9 @@ download_target() {
   fi
   readonly target_path
 
+  # show paths
+  put_printf "local:${t_green}${target_path}${t_reset} <= remote:${t_green}${source_path}${t_reset}\n"
+
   # get type of source: file or directory
   if ${ssh_connect} "test -d ${source_path}"; then
     source_type='d'
@@ -565,13 +577,11 @@ download_target() {
     check_error ${ERR_FILE_SYSTEM} "Path '${source_path}' does not exist."
   fi
 
-  archive_filename=${source_basename}.tar.gz
   if [ ${source_type} == 'f' ]; then
     target_to_archive=${source_basename}
     if [[ "${source_basename}" =~ \.(tar|gz)$ ]]; then
       # ignore packing archives
       target_to_archive=''
-      archive_filename=''
     fi
     source_dir=$(dirname "${source_path}")
   else
@@ -586,10 +596,9 @@ download_target() {
     check_error ${ERR_FILE_SYSTEM} "No such target path '${target_path}'."
   fi
 
-  put_printf "local:${t_green}${target_path}${t_reset} <= remote:${t_green}${source_path}/${target_to_archive}${t_reset}\n"
   if [ -n "${target_to_archive}" ]; then
-    transfer_file=$(${ssh_connect} 'cd; pwd')"/${archive_filename}"
-    transfer_filename=${archive_filename}
+    transfer_file=$(${ssh_connect} 'cd; pwd')"/${source_basename}.tar.gz"
+    transfer_filename=$(basename ${transfer_file})
     put_echo ${VERBOSE_VERY} "Packing target files into archive ${transfer_file}..."
 
     put_printf "Packing file/s..."
@@ -612,20 +621,20 @@ download_target() {
   fi
   put_echo "${t_OK}"
 
-  if [ -n "${target_path}" ] && [ -n "${target_to_archive}" ]; then
+  if [ -n "${target_path}" ] && [ -n "${target_to_archive}" ] || [ ${unpack_automatically} == 1 ]; then
     # Unpack downloaded archive
     put_printf "Unpacking archive..."
-    tar xf $(tmp_dir)/${archive_filename} -C ${target_path}
+    tar xf $(tmp_dir)/${transfer_filename} -C ${target_path:-.}
     put_echo "${t_OK}"
-    rm -f $(tmp_dir)/${archive_filename}
-  elif [ -z "${target_path}" ] && [ -n "${target_to_archive}" ]; then
+    rm -f $(tmp_dir)/${transfer_filename}
+  elif [ -z "${target_path}" ] && [ -n "${target_to_archive}" ] && [ ${unpack_automatically} == 0 ]; then
     # target path is not defined. Just copy created archive
-    mv $(tmp_dir)/${archive_filename} .
-    echo 'Archive of target file/s: '${PWD%/}/${archive_filename}
-  elif [ -z "${target_to_archive}" ]; then
+    mv $(tmp_dir)/${transfer_filename} .
+    put_echo 'Archive of target file/s: '${PWD%/}/${transfer_filename}
+  elif [ -z "${target_to_archive}" ] && [ ${unpack_automatically} == 0 ]; then
     # target file wasn't packed just move it into a target path
     mv $(tmp_dir)/${transfer_filename} ${target_path:-${PWD%/}}
-    echo 'Downloaded file: '${target_path:-${PWD%/}}/${transfer_filename}
+    put_echo 'Downloaded file: '${target_path:-${PWD%/}}/${transfer_filename}
   else
     check_error ${ERR_LOGIC} "Cannot process downloaded archive ''"
   fi
@@ -633,7 +642,7 @@ download_target() {
 
 self_update () {
   if [ -e ${__file} ] && [ ! -w ${__file} ]; then
-      echo 'error: No permissions to perform update.'
+      put_echo 'error: No permissions to perform update.'
       exit 1
   fi
 
@@ -641,13 +650,13 @@ self_update () {
   put_echo ${VERBOSE_DEBUG} "cmd: curl -Ls ${download_url} | bash -s -- --file ${__file} $@"
 
   if ! curl -Ls ${download_url} | bash -s -- --file ${__file} $@ > /dev/null 2>&1; then
-    echo 'error: Cannot complete update.'
+    put_echo 'error: Cannot complete update.'
     exit 1
   fi
 
   # show version
   ${__file} --help | head -1 | grep -oE '[v].*'
-  echo 'Update completed.'
+  put_echo 'Update completed.'
 }
 
 process_deployment() {
@@ -671,10 +680,10 @@ process_deployment() {
     test_connection
     return
   elif [ "${action_type}" == 'config-file' ]; then
-    echo ${config_file}
+    put_echo ${VERBOSE_OFF} ${config_file}
     return
   elif [[ "${action_type}" =~ ^(show-)?ssh-connection$ ]]; then
-    echo ${ssh_connect}
+    put_echo ${VERBOSE_OFF} ${ssh_connect}
     return
   elif [[ "${action_type}" =~ self-?update ]]; then
     self_update ${rest_options}
