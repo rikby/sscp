@@ -1,13 +1,14 @@
-# `sscp` Command line Deployment Tool
-Download/upload whole directories to/from remote environments.
+# `sscp` Command line upload/download tool
+Download/upload whole directories to/from remote environments using `scp`, `ssh`, and packing files with `tar` in one command.
 
 In common sense it's something similar to SFTP aliases.
 
 ## How it works?
 It uses SSH for running commands (for pack/unpack files, etc.) and SCP for deploy/download target file/archive of files.
+For packing files uses `tar`.
 
 ## Why?
-The script archive whole directory and it much faster than deployment with IDE like IDEA because it performs one-by-one.
+The script can archive whole directory and transfer it. And it's much faster than transferring files with IDE like IDEA because it process them one-by-one.
 
 # Installation
 At first, we need to download binary file
