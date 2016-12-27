@@ -409,6 +409,17 @@ test_connection() {
   ${ssh_connect} -C 'cd > /dev/null' && put_echo 'OK' || check_error ${ERR_CONNECTION} "Cannot connect to the server (${connect} ${port})."
 }
 
+tmp_dir () {
+  local tmp
+  if [ "${SSCP_TEMP}" == '~' ] \
+  || [ '1' == "$(touch ${SSCP_TEMP}/sscp-test 2> /dev/null && rm -f ${SSCP_TEMP}/sscp-test || echo 1)" ]; then
+    tmp=$(cd; pwd)
+  else
+    tmp=${SSCP_TEMP}
+  fi
+  echo ${tmp}
+}
+
 deploy_target() {
   test_connection > /dev/null
 
@@ -440,23 +451,23 @@ deploy_target() {
   fi
 
   if [ -f "${path1}" ]; then
-    upload_type='f'
+    source_type='f'
     source_path=${path1}
     source_dir=$(dirname ${path1})
   elif [ -d "${path1}" ]; then
-    upload_type='d'
+    source_type='d'
     source_path=${path1}
     source_dir=${path1}
   elif [ -n  "${local_base_dir}" ] && [ -z "${path1}" ] && [ -z "${path2}" ]; then
-    upload_type='d'
+    source_type='d'
     source_path=${local_base_dir}
     source_dir=${local_base_dir}
   elif [ -n "${local_base_dir}" ] && [ -f ${local_base_dir}/${path1} ]; then
-    upload_type='f'
+    source_type='f'
     source_path=${local_base_dir}/${path1}
     source_dir=$(dirname ${local_base_dir}/${path1})
   elif [ -n  "${local_base_dir}" ] && [ -d ${local_base_dir}/${path1} ]; then
-    upload_type='d'
+    source_type='d'
     source_path=${local_base_dir}/${path1}
     source_dir=${local_base_dir}/${path1}
   else
@@ -464,21 +475,16 @@ deploy_target() {
   fi
 
   put_printf "local:${t_green}%s${t_reset} => remote:${t_green}%s${t_reset}\n" "${source_path}" "${target_dir}"
-  if [ ${upload_type} = 'd' ] || [[ ! ${source_path} =~ .*\.tar\.gz$ ]]; then
+  if [ ${source_type} = 'd' ] || [[ ! ${source_path} =~ .*\.tar\.gz$ ]]; then
     put_printf 'Packing file/s...'
 
     source_archive=$(basename ${source_path}).tar.gz
-    if [ "${SSCP_TEMP}" == '~' ]; then
-      tmp=$(cd; pwd)
-    else
-      tmp=${SSCP_TEMP}
-    fi
-    source_archive_deploy=${tmp}/${source_archive}
+    source_archive_deploy=$(tmp_dir)/${source_archive}
 
     # remove previous archive
     rm -f ${source_archive_deploy}
 
-    if [ ${upload_type} = 'd' ]; then
+    if [ ${source_type} = 'd' ]; then
       put_echo ${VERBOSE_VERY} 'Deploy directory mode.'
       tar czf ${source_archive_deploy} -C ${source_dir} . ${exclude} ${rest_options}
     else
@@ -512,85 +518,116 @@ deploy_target() {
 }
 
 download_target() {
+  local archive_created source_path target_dir \
+    transfer_file transfer_filename target_to_archive
+
+  #####
+  # Determine source path
   # add defined base directories
   if [ "${path1::1}" == '/' ] ||  [ -z "${remote_base_dir}" ]; then
     # absolute remote path
-    source_dir=${path1}
+    source_path=${path1}
   else
     # relative remote path
-    source_dir=${remote_base_dir}
+    source_path=${remote_base_dir}
     if [ '.' != "${path1:-.}" ]; then
-      source_dir+="/${path1}"
+      source_path+="/${path1}"
     fi
   fi
+  source_basename=$(basename "${source_path}")
+  readonly source_path source_basename
+
+  #####
+  # Determine target path path
   if [ "${path2::1}" == '/' ] || [ -z "${local_base_dir}" ]; then
     # absolute remote path
-    target_dir=${path2}
+    target_path=${path2}
   elif [ -n "${path2}" ]; then
     # relative remote path
-    target_dir=${local_base_dir}
+    target_path=${local_base_dir}
     if [ '.' != "${path2}" ]; then
-      target_dir+="/${path2}"
+      target_path+="/${path2}"
     fi
   elif [ -z "${path1}" ] && [ -z "${path2}" ] && [ -n "${local_base_dir}" ]; then
-    target_dir=${local_base_dir}
+    # Set default local base directory if arguments are empty
+    target_path=${local_base_dir}
   else
     check_error ${ERR_LOGIC} "Cannot determine target path."
   fi
+  readonly target_path
 
-  if ${ssh_connect} "test -d ${source_dir}"; then
-    target_type='d'
-  elif ${ssh_connect} "test -f ${source_dir}"; then
-    target_type='f'
+  # get type of source: file or directory
+  if ${ssh_connect} "test -d ${source_path}"; then
+    source_type='d'
+  elif ${ssh_connect} "test -f ${source_path}"; then
+    source_type='f'
   else
-    check_error ${ERR_FILE_SYSTEM} "Path '${source_dir}' does not exist."
+    check_error ${ERR_FILE_SYSTEM} "Path '${source_path}' does not exist."
   fi
 
-  if [ ${target_type} == 'f' ]; then
-    target_basename=$(basename "${source_dir}")
-    target_to_archive=''
-    download_file=${source_dir}
-    if [[ ! "${target_basename}" =~ \.(tar|gz)$ ]]; then
+  archive_filename=${source_basename}.tar.gz
+  if [ ${source_type} == 'f' ]; then
+    target_to_archive=${source_basename}
+    if [[ "${source_basename}" =~ \.(tar|gz)$ ]]; then
       # ignore packing archives
-      target_to_archive=$(basename "${source_dir}")
+      target_to_archive=''
+      archive_filename=''
     fi
-    source_dir=$(dirname "${source_dir}")
+    source_dir=$(dirname "${source_path}")
   else
-    target_basename=$( basename "${source_dir}" )
+    source_dir=${source_path}
     target_to_archive='.'
   fi
 
   # validate params
-  ${ssh_connect} "ls -la ${source_dir} > /dev/null 2>&1"
-  check_error $? "Path '${source_dir}' does not exist."
-  if [ -n "${target_dir}" ] && [ ! -d "${target_dir}" ]; then
-    check_error ${ERR_FILE_SYSTEM} "No such directory '${target_dir}'."
+  ${ssh_connect} "ls -la ${source_path} > /dev/null 2>&1"
+  check_error $? "Path '${source_path}' does not exist."
+  if [ -n "${target_path}" ] && [ ! -d "${target_path}" ]; then
+    check_error ${ERR_FILE_SYSTEM} "No such target path '${target_path}'."
   fi
 
-  put_printf "local:${t_green}${target_dir:-./${target_basename}.tar.gz}${t_reset} <= remote:${t_green}${source_dir}/${target_to_archive}${t_reset}\n"
+  put_printf "local:${t_green}${target_path}${t_reset} <= remote:${t_green}${source_path}/${target_to_archive}${t_reset}\n"
   if [ -n "${target_to_archive}" ]; then
+    transfer_file=$(${ssh_connect} 'cd; pwd')"/${archive_filename}"
+    transfer_filename=${archive_filename}
+    put_echo ${VERBOSE_VERY} "Packing target files into archive ${transfer_file}..."
+
     put_printf "Packing file/s..."
-    download_file="${SSCP_TEMP}/${target_basename}.tar.gz"
-    ${ssh_connect} "rm -f ${download_file}" # clean up
-    ${ssh_connect} "tar czf ${download_file} -C ${source_dir} ${target_to_archive} ${exclude} ${rest_options}"
+    ${ssh_connect} "rm -f ${transfer_file}" # clean up
+    ${ssh_connect} "tar czf ${transfer_file} -C ${source_dir} ${target_to_archive} ${exclude} ${rest_options}"
+
     put_echo "${t_OK}"
+  else
+    transfer_file=${source_path}
+    transfer_filename=${source_basename}
   fi
+
+  put_echo ${VERBOSE_VERY} "Downloading archive ${transfer_file} into $(tmp_dir)..."
 
   put_printf 'Downloading archive...'
-  ${scp_connect} ${connect}:${download_file} ./
+  ${scp_connect} ${connect}:${transfer_file} $(tmp_dir)
   check_error $? 'Unable to download archive.'
   if [ -n "${target_to_archive}" ]; then
-    ${ssh_connect} "rm -rf ${SSCP_TEMP}/${target_basename}.tar.gz"
+    ${ssh_connect} "rm -rf ${transfer_file}"
   fi
   put_echo "${t_OK}"
 
-  if [ -n "${target_dir}" ]; then
+  if [ -n "${target_path}" ] && [ -n "${target_to_archive}" ]; then
+    # Unpack downloaded archive
     put_printf "Unpacking archive..."
-    tar xf ./${target_basename}.tar.gz -C ${target_dir}
+    tar xf $(tmp_dir)/${archive_filename} -C ${target_path}
     put_echo "${t_OK}"
-    rm -f ./${target_basename}.tar.gz
+    rm -f $(tmp_dir)/${archive_filename}
+  elif [ -z "${target_path}" ] && [ -n "${target_to_archive}" ]; then
+    # target path is not defined. Just copy created archive
+    mv $(tmp_dir)/${archive_filename} .
+    echo 'Archive of target file/s: '${PWD%/}/${archive_filename}
+  elif [ -z "${target_to_archive}" ]; then
+    # target file wasn't packed just move it into a target path
+    mv $(tmp_dir)/${transfer_filename} ${target_path:-${PWD%/}}
+    echo 'Downloaded file: '${target_path:-${PWD%/}}/${transfer_filename}
   else
-    echo 'Archive of target file/s: './${target_basename}.tar.gz
+    check_error ${ERR_LOGIC} "Cannot process downloaded archive ''"
   fi
 }
 
@@ -656,7 +693,7 @@ SSCP_SCP_BIN=${SSCP_SCP_BIN}
 SSCP_EXCLUDE=${SSCP_EXCLUDE}
 # Default connection
 SSCP_CONNECT=${SSCP_CONNECT}
-# Default temp directory. It uses in a remote server as well
+# Default temp directory. It uses on the local server for temporary archives.
 SSCP_TEMP=${SSCP_TEMP}
 # disable using colors
 SSCP_NO_COLOR=${SSCP_NO_COLOR}
