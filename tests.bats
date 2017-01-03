@@ -315,6 +315,8 @@ EOF
   rm -rf /tmp/sscp-bats-tests/tuser-target \
     /tmp/sscp-bats-tests/tuser \
     /tmp/sscp-bats-tests/some
+
+  # create not related directory and put .sscprc file in there
   mkdir -p /tmp/sscp-bats-tests/some
   cd /tmp/sscp-bats-tests/some
   cat <<- EOF > .sscprc
@@ -329,7 +331,35 @@ EOF
 
   touch /tmp/sscp-bats-tests/tuser/file1
 
-  run bash -x /code/sscp upload file1 .
+  run /code/sscp upload file1 .
+
+  [ "${status}" -eq 0 ]
+
+  expected='./file1'
+  result=$(cd /tmp/sscp-bats-tests/tuser-target; find . -type f)
+
+  [[ "${expected}" == "${result}" ]]
+}
+
+@test "Test upload with predefined remote path and relative local path in the command." {
+  rm -rf /tmp/sscp-bats-tests/tuser-target \
+    /tmp/sscp-bats-tests/tuser \
+    /tmp/sscp-bats-tests/some
+
+  mkdir -p /tmp/sscp-bats-tests/tuser
+  cd /tmp/sscp-bats-tests/tuser
+
+  cat <<- EOF > .sscprc
+connect='root@localhost'
+remote_base_dir='/tmp/sscp-bats-tests/tuser-target'
+EOF
+
+  mkdir -p /tmp/sscp-bats-tests/tuser
+  mkdir -p /tmp/sscp-bats-tests/tuser-target
+
+  touch /tmp/sscp-bats-tests/tuser/file1
+
+  run /code/sscp upload file1
 
   [ "${status}" -eq 0 ]
 
