@@ -2,14 +2,8 @@
 
 # Download this file in Windows GitBash
 #  curl -Ls https://raw.github.com/rikby/sscp/master/sscp -o /usr/bin/sscp
-# Global vars:
-#   SSCP_RC=.sscprc     - Global resource file
-#   SSCP_SSH_BIN=ssh    - SSH bin file
-#   SSCP_SCP_BIN=scp    - SCP bin file
-#   SSCP_EXCLUDE=.idea  - Custom exclude list.
-#   SSCP_TEMP=~         - Temp directory for archive. It uses for remote servers.
-#   SSCP_CONNECT=.vagrant@127.0.0.1
-#                       - Connection host and user.
+# Global vars - run command:
+#   $ sscp show-vars
 
 set -o pipefail
 set -o errexit
@@ -47,6 +41,8 @@ SSCP_CONNECT=${SSCP_CONNECT:-vagrant@127.0.0.1}
 SSCP_TEMP=${SSCP_TEMP:-'~'}
 # disable using colors
 SSCP_NO_COLOR=${SSCP_NO_COLOR:-0}
+# always auto-create directory on download if ${local_base_dir} is predefined
+SSCP_AUTO_CREATE_DIR_ON_DOWNLOAD=${SSCP_AUTO_CREATE_DIR_ON_DOWNLOAD:-1}
 # verbose level
 SSCP_VERBOSE=${SSCP_VERBOSE:-${VERBOSE}}
 SSCP_NEW_HOST_RESET_PORT=${SSCP_NEW_HOST_RESET_PORT:-1}
@@ -557,9 +553,12 @@ download_target() {
     if [ '.' != "${path2}" ]; then
       target_path+="/${path2}"
     fi
-  elif [ -z "${path1}" ] && [ -z "${path2}" ] && [ -n "${local_base_dir}" ]; then
-    # Set default local base directory if arguments are empty
+  elif [ -z "${path2}" ] && [ -n "${local_base_dir}" ]; then
+    # Set default local base directory if the second argument is empty
     target_path=${local_base_dir}
+    if [ -n "${path1}" ] && [ "${path1::1}" != '/' ]; then
+      target_path=${local_base_dir}/${path1}
+    fi
   else
     check_error ${ERR_LOGIC} "Cannot determine target path."
   fi
@@ -592,8 +591,12 @@ download_target() {
   # validate params
   ${ssh_connect} "ls -la ${source_path} > /dev/null 2>&1"
   check_error $? "Path '${source_path}' does not exist."
-  if [ -n "${target_path}" ] && [ ! -d "${target_path}" ]; then
-    check_error ${ERR_FILE_SYSTEM} "No such target path '${target_path}'."
+
+  if [ 0 == ${create_target_path} ] && [ 0 == $(ls -la ${target_path} > /dev/null 2>&1 && echo 1 || echo 0) ]; then
+    check_error ${ERR_FILE_SYSTEM} "Local target directory ${target_path} does not exist."
+  fi
+  if [ 1 == ${create_target_path} ] && [ 0 == $(mkdir ${target_path} -p > /dev/null 2>&1 && echo 1 || echo 0) ]; then
+    check_error ${ERR_FILE_SYSTEM} "Could not create local target directory '${target_path}'."
   fi
 
   if [ -n "${target_to_archive}" ]; then
@@ -666,6 +669,12 @@ process_deployment() {
   # Init passed params
   read_params $@
 
+  # In case if local base dir is defined force creating local directory
+  if [ ${action_type} == 'download' ] && [ -n "${local_base_dir}" ] \
+  && [ ${SSCP_AUTO_CREATE_DIR_ON_DOWNLOAD} == 1 ]; then
+    create_target_path=1
+  fi
+
   if [ -z "${action_type}" ]; then
     show_help
     check_error ${ERR_PARAMS} 'Empty action type.'
@@ -710,6 +719,8 @@ SSCP_NO_COLOR=${SSCP_NO_COLOR}
 SSCP_VERBOSE=${SSCP_VERBOSE}
 # if default host has been changed drop port as well
 SSCP_NEW_HOST_RESET_PORT=${SSCP_NEW_HOST_RESET_PORT}
+# always auto-create directory on download if \${local_base_dir} is predefined in .sscprc file
+SSCP_AUTO_CREATE_DIR_ON_DOWNLOAD=${SSCP_AUTO_CREATE_DIR_ON_DOWNLOAD}
 EOF
     return
   fi

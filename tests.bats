@@ -524,3 +524,32 @@ EOF
 
   [[ "${expected}" == "${result}" ]]
 }
+
+
+@test "Test downloading a directory by predefined paths." {
+  rm -rf /tmp/sscp-bats-tests/tuser-target \
+    /tmp/sscp-bats-tests/tuser
+
+  mkdir -p /tmp/sscp-bats-tests/tuser/test1
+  mkdir -p /tmp/sscp-bats-tests/tuser-target
+
+  touch /tmp/sscp-bats-tests/tuser/file1
+  touch /tmp/sscp-bats-tests/tuser/test1/file2
+
+  cd /tmp/sscp-bats-tests/tuser-target
+  cat <<- EOF > /tmp/sscp-bats-tests/tuser-target/.sscprc
+connect='localhost'
+remote_base_dir='/tmp/sscp-bats-tests/tuser'
+local_base_dir='.'
+EOF
+
+  run sscp D test1
+
+  [ "${status}" -eq 0 ]
+
+  expected=$(printf "./.sscprc
+./test1/file2")
+  result=$(cd /tmp/sscp-bats-tests/tuser-target; find . -type f)
+
+  [[ "${expected}" == "${result}" ]]
+}
