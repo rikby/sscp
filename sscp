@@ -48,6 +48,8 @@ SSCP_VERBOSE=${SSCP_VERBOSE:-${VERBOSE}}
 SSCP_NEW_HOST_RESET_PORT=${SSCP_NEW_HOST_RESET_PORT:-1}
 sscp_verbose=${SSCP_VERBOSE}
 
+tar_pack_options=" ${SSCP_TAR_PACK_OPTIONS:-} "
+
 if [ "${VERBOSE_DEBUG}" -eq "${SSCP_VERBOSE}" ]; then
   # enable traced output
   set -o xtrace
@@ -72,7 +74,7 @@ t_OK=${t_green}'OK'${t_reset}
 
 show_help () {
     cat << EOF
-SSCP Shell Tool v0.11.0
+SSCP Shell Tool v0.12.0
 Fast downloader/deployer for remote servers.
 It archives files by using tar and transports them using by SCP. So, just pack and transfer.
 All commands run by using SSH connection.
@@ -131,7 +133,7 @@ Download file or directory from remote server. Command:
               If this argument is omitted made archive will be placed into
               a current directory.
 
-OPTIONS FOR DEPLOYMENT
+OPTIONS FOR FILE TRANSFERRING
   -p|--port PORT
               Define custom connection port.
               Default: 2222
@@ -149,6 +151,8 @@ OPTIONS FOR DEPLOYMENT
               Ignore all default excluding.
   -c|--create-destination
               Create destination path automatically.
+  -x|--tar-exclude
+              Add exclude path on pack files.
   -u|--unpack Unpack downloaded archive automatically in case when archive was created before transferring.
   -h|--help   Show this help
 
@@ -271,6 +275,7 @@ read_params () {
     [v]=verbose
     [D]=debug
     [u]=unpack
+    [x:]=tar-exclude:
   )
   OPTS=`getopt -o $(echo ${!options[*]} | tr -d ' ') -l $(echo ${options[*]} | tr ' ' ',') -- "$@"`
   eval set -- "${OPTS}"
@@ -314,6 +319,10 @@ read_params () {
         ;;
       -H|--host)
         connect="$2"
+        shift 2
+        ;;
+      -x|--tar-exclude)
+        tar_pack_options+=" --exclude=$2 "
         shift 2
         ;;
       -h|--help)
@@ -487,10 +496,10 @@ deploy_target() {
 
     if [ ${source_type} = 'd' ]; then
       put_echo ${VERBOSE_VERY} 'Deploy directory mode.'
-      tar czf ${source_archive_deploy} -C ${source_dir} . ${exclude} ${rest_options}
+      tar czf ${source_archive_deploy} -C ${source_dir} . ${exclude} ${tar_pack_options} ${rest_options}
     else
       put_echo ${VERBOSE_VERY} 'Deploy single file mode.'
-      tar czf ${source_archive_deploy} -C ${source_dir} $(basename ${source_path}) ${exclude} ${rest_options}
+      tar czf ${source_archive_deploy} -C ${source_dir} $(basename ${source_path}) ${exclude} ${tar_pack_options} ${rest_options}
     fi
     put_echo "${t_OK}"
     archive_created=1
@@ -606,7 +615,7 @@ download_target() {
 
     put_printf "Packing file/s..."
     ${ssh_connect} "rm -f ${transfer_file}" # clean up
-    ${ssh_connect} "tar czf ${transfer_file} -C ${source_dir} ${target_to_archive} ${exclude} ${rest_options}"
+    ${ssh_connect} "tar czf ${transfer_file} -C ${source_dir} ${target_to_archive} ${exclude} ${tar_pack_options} ${rest_options}"
 
     put_echo "${t_OK}"
   else
@@ -721,6 +730,8 @@ SSCP_VERBOSE=${SSCP_VERBOSE}
 SSCP_NEW_HOST_RESET_PORT=${SSCP_NEW_HOST_RESET_PORT}
 # always auto-create directory on download if \${local_base_dir} is predefined in .sscprc file
 SSCP_AUTO_CREATE_DIR_ON_DOWNLOAD=${SSCP_AUTO_CREATE_DIR_ON_DOWNLOAD}
+# always auto-create directory on download if \${local_base_dir} is predefined in .sscprc file
+SSCP_TAR_PACK_OPTIONS=${SSCP_TAR_PACK_OPTIONS:-}
 EOF
     return
   fi

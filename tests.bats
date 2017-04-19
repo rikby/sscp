@@ -212,7 +212,7 @@ EOF
 
   mkdir -p /tmp/sscp-bats-tests/dir222/test1
   mkdir -p /tmp/sscp-bats-tests/dir111
-  chown dir222 -R /tmp/sscp-bats-tests/dir111
+  chown tuser -R /tmp/sscp-bats-tests/dir111
 
   touch /tmp/sscp-bats-tests/dir222/.gitignore
   touch /tmp/sscp-bats-tests/dir222/.hidden
@@ -237,7 +237,7 @@ EOF
 
   mkdir -p /tmp/sscp-bats-tests/dir222/test1
   mkdir -p /tmp/sscp-bats-tests/dir111
-  chown dir222 -R /tmp/sscp-bats-tests/dir111
+  chown tuser -R /tmp/sscp-bats-tests/dir111
 
   touch /tmp/sscp-bats-tests/dir222/.gitignore
   touch /tmp/sscp-bats-tests/dir222/.hidden
@@ -264,7 +264,7 @@ EOF
 
   mkdir -p /tmp/sscp-bats-tests/dir222/test1
   mkdir -p /tmp/sscp-bats-tests/dir111
-  chown dir222 -R /tmp/sscp-bats-tests/dir111
+  chown tuser -R /tmp/sscp-bats-tests/dir111
 
   touch /tmp/sscp-bats-tests/dir222/.gitignore
   touch /tmp/sscp-bats-tests/dir222/.hidden
@@ -549,6 +549,34 @@ EOF
 
   expected=$(printf "./.sscprc
 ./test1/file2")
+  result=$(cd /tmp/sscp-bats-tests/dir111; find . -type f)
+
+  [[ "${expected}" == "${result}" ]]
+}
+
+@test "Test exclude option." {
+  rm -rf /tmp/sscp-bats-tests/dir111 \
+    /tmp/sscp-bats-tests/dir222
+
+  mkdir -p /tmp/sscp-bats-tests/dir222/test1
+  mkdir -p /tmp/sscp-bats-tests/dir111
+
+  touch /tmp/sscp-bats-tests/dir222/file1
+  touch /tmp/sscp-bats-tests/dir222/test1/file2
+
+  cd /tmp/sscp-bats-tests/dir111
+  cat <<- EOF > /tmp/sscp-bats-tests/dir111/.sscprc
+connect='localhost'
+remote_base_dir='/tmp/sscp-bats-tests/dir222'
+local_base_dir='.'
+EOF
+
+  run sscp D . --tar-exclude test1
+
+  [ "${status}" -eq 0 ]
+
+  expected=$(printf "./.sscprc
+./file1")
   result=$(cd /tmp/sscp-bats-tests/dir111; find . -type f)
 
   [[ "${expected}" == "${result}" ]]
