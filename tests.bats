@@ -44,13 +44,13 @@ output=''
 }
 
 @test "Test show-ssh-connection from .sscprc." {
-  rm -rf /tmp/sscp-bats-tests/tuser
-  mkdir -p /tmp/sscp-bats-tests/tuser
-  cat <<- EOF > /tmp/sscp-bats-tests/tuser/.sscprc
+  rm -rf /tmp/sscp-bats-tests/dir222
+  mkdir -p /tmp/sscp-bats-tests/dir222
+  cat <<- EOF > /tmp/sscp-bats-tests/dir222/.sscprc
 connect='invalid.localhost'
 port=19999
 EOF
-  cd /tmp/sscp-bats-tests/tuser
+  cd /tmp/sscp-bats-tests/dir222
 
   run sscp show-ssh-connection
 
@@ -109,13 +109,13 @@ EOF
 }
 
 @test "Test overriding host and port from .sscprc with params (show-ssh-connection)." {
-  rm -rf /tmp/sscp-bats-tests/tuser
-  mkdir -p /tmp/sscp-bats-tests/tuser
-  cat <<- EOF > /tmp/sscp-bats-tests/tuser/.sscprc
+  rm -rf /tmp/sscp-bats-tests/dir222
+  mkdir -p /tmp/sscp-bats-tests/dir222
+  cat <<- EOF > /tmp/sscp-bats-tests/dir222/.sscprc
 connect='invalid.localhost'
 port=19999
 EOF
-  cd /tmp/sscp-bats-tests/tuser
+  cd /tmp/sscp-bats-tests/dir222
 
   run sscp show-ssh-connection --host localhost --port 22
 
@@ -158,41 +158,41 @@ EOF
 }
 
 @test "Test download." {
-  rm -rf /tmp/sscp-bats-tests/tuser-target \
-    /tmp/sscp-bats-tests/tuser
+  rm -rf /tmp/sscp-bats-tests/dir111 \
+    /tmp/sscp-bats-tests/dir222
 
-  mkdir -p /tmp/sscp-bats-tests/tuser/test1
-  mkdir -p /tmp/sscp-bats-tests/tuser-target
+  mkdir -p /tmp/sscp-bats-tests/dir222/test1
+  mkdir -p /tmp/sscp-bats-tests/dir111
 
-  touch /tmp/sscp-bats-tests/tuser/.gitignore
-  touch /tmp/sscp-bats-tests/tuser/.hidden
-  touch /tmp/sscp-bats-tests/tuser/test1/some-file
+  touch /tmp/sscp-bats-tests/dir222/.gitignore
+  touch /tmp/sscp-bats-tests/dir222/.hidden
+  touch /tmp/sscp-bats-tests/dir222/test1/some-file
 
-  run sscp D /tmp/sscp-bats-tests/tuser /tmp/sscp-bats-tests/tuser-target --host localhost
+  run sscp D /tmp/sscp-bats-tests/dir222 /tmp/sscp-bats-tests/dir111 --host localhost
 
   [ "${status}" -eq 0 ]
 
   expected=$(printf \
 "./test1/some-file
 ./.hidden")
-  result=$(cd /tmp/sscp-bats-tests/tuser-target; find . -type f)
+  result=$(cd /tmp/sscp-bats-tests/dir111; find . -type f)
 
   [[ "${expected}" == "${result}" ]]
 }
 
 @test "Test download with VCS files." {
-  rm -rf /tmp/sscp-bats-tests/tuser-target \
-    /tmp/sscp-bats-tests/tuser
+  rm -rf /tmp/sscp-bats-tests/dir111 \
+    /tmp/sscp-bats-tests/dir222
 
-  mkdir -p /tmp/sscp-bats-tests/tuser/test1
-  mkdir -p /tmp/sscp-bats-tests/tuser-target
+  mkdir -p /tmp/sscp-bats-tests/dir222/test1
+  mkdir -p /tmp/sscp-bats-tests/dir111
 
-  touch /tmp/sscp-bats-tests/tuser/.gitignore
-  touch /tmp/sscp-bats-tests/tuser/.hidden
-  touch /tmp/sscp-bats-tests/tuser/test1/some-file
-  touch /tmp/sscp-bats-tests/tuser/test1/.gitignore
+  touch /tmp/sscp-bats-tests/dir222/.gitignore
+  touch /tmp/sscp-bats-tests/dir222/.hidden
+  touch /tmp/sscp-bats-tests/dir222/test1/some-file
+  touch /tmp/sscp-bats-tests/dir222/test1/.gitignore
 
-  run sscp D /tmp/sscp-bats-tests/tuser /tmp/sscp-bats-tests/tuser-target --host localhost --use-vcs
+  run sscp D /tmp/sscp-bats-tests/dir222 /tmp/sscp-bats-tests/dir111 --host localhost --use-vcs
 
   [ "${status}" -eq 0 ]
 
@@ -201,50 +201,50 @@ EOF
 ./test1/.gitignore
 ./.gitignore
 ./.hidden")
-  result=$(cd /tmp/sscp-bats-tests/tuser-target; find . -type f)
+  result=$(cd /tmp/sscp-bats-tests/dir111; find . -type f)
 
   [[ "${expected}" == "${result}" ]]
 }
 
 @test "Test upload." {
-  rm -rf /tmp/sscp-bats-tests/tuser-target \
-    /tmp/sscp-bats-tests/tuser
+  rm -rf /tmp/sscp-bats-tests/dir111 \
+    /tmp/sscp-bats-tests/dir222
 
-  mkdir -p /tmp/sscp-bats-tests/tuser/test1
-  mkdir -p /tmp/sscp-bats-tests/tuser-target
-  chown tuser -R /tmp/sscp-bats-tests/tuser-target
+  mkdir -p /tmp/sscp-bats-tests/dir222/test1
+  mkdir -p /tmp/sscp-bats-tests/dir111
+  chown dir222 -R /tmp/sscp-bats-tests/dir111
 
-  touch /tmp/sscp-bats-tests/tuser/.gitignore
-  touch /tmp/sscp-bats-tests/tuser/.hidden
-  touch /tmp/sscp-bats-tests/tuser/test1/some-file
-  touch /tmp/sscp-bats-tests/tuser/test1/.gitignore
+  touch /tmp/sscp-bats-tests/dir222/.gitignore
+  touch /tmp/sscp-bats-tests/dir222/.hidden
+  touch /tmp/sscp-bats-tests/dir222/test1/some-file
+  touch /tmp/sscp-bats-tests/dir222/test1/.gitignore
 
-  run sscp U /tmp/sscp-bats-tests/tuser /tmp/sscp-bats-tests/tuser-target --host localhost
+  run sscp U /tmp/sscp-bats-tests/dir222 /tmp/sscp-bats-tests/dir111 --host localhost
 
   [ "${status}" -eq 0 ]
 
   expected=$(printf \
 "./test1/some-file
 ./.hidden")
-  result=$(cd /tmp/sscp-bats-tests/tuser-target; find . -type f)
+  result=$(cd /tmp/sscp-bats-tests/dir111; find . -type f)
 
   [[ "${expected}" == "${result}" ]]
 }
 
 @test "Test upload with VCS files." {
-  rm -rf /tmp/sscp-bats-tests/tuser-target \
-    /tmp/sscp-bats-tests/tuser
+  rm -rf /tmp/sscp-bats-tests/dir111 \
+    /tmp/sscp-bats-tests/dir222
 
-  mkdir -p /tmp/sscp-bats-tests/tuser/test1
-  mkdir -p /tmp/sscp-bats-tests/tuser-target
-  chown tuser -R /tmp/sscp-bats-tests/tuser-target
+  mkdir -p /tmp/sscp-bats-tests/dir222/test1
+  mkdir -p /tmp/sscp-bats-tests/dir111
+  chown dir222 -R /tmp/sscp-bats-tests/dir111
 
-  touch /tmp/sscp-bats-tests/tuser/.gitignore
-  touch /tmp/sscp-bats-tests/tuser/.hidden
-  touch /tmp/sscp-bats-tests/tuser/test1/some-file
-  touch /tmp/sscp-bats-tests/tuser/test1/.gitignore
+  touch /tmp/sscp-bats-tests/dir222/.gitignore
+  touch /tmp/sscp-bats-tests/dir222/.hidden
+  touch /tmp/sscp-bats-tests/dir222/test1/some-file
+  touch /tmp/sscp-bats-tests/dir222/test1/.gitignore
 
-  run sscp U /tmp/sscp-bats-tests/tuser /tmp/sscp-bats-tests/tuser-target --host localhost --use-vcs
+  run sscp U /tmp/sscp-bats-tests/dir222 /tmp/sscp-bats-tests/dir111 --host localhost --use-vcs
 
   [ "${status}" -eq 0 ]
 
@@ -253,67 +253,67 @@ EOF
 ./test1/.gitignore
 ./.gitignore
 ./.hidden")
-  result=$(cd /tmp/sscp-bats-tests/tuser-target; find . -type f)
+  result=$(cd /tmp/sscp-bats-tests/dir111; find . -type f)
 
   [[ "${expected}" == "${result}" ]]
 }
 
 @test "Test creating destination path during upload." {
-  rm -rf /tmp/sscp-bats-tests/tuser-target \
-    /tmp/sscp-bats-tests/tuser
+  rm -rf /tmp/sscp-bats-tests/dir111 \
+    /tmp/sscp-bats-tests/dir222
 
-  mkdir -p /tmp/sscp-bats-tests/tuser/test1
-  mkdir -p /tmp/sscp-bats-tests/tuser-target
-  chown tuser -R /tmp/sscp-bats-tests/tuser-target
+  mkdir -p /tmp/sscp-bats-tests/dir222/test1
+  mkdir -p /tmp/sscp-bats-tests/dir111
+  chown dir222 -R /tmp/sscp-bats-tests/dir111
 
-  touch /tmp/sscp-bats-tests/tuser/.gitignore
-  touch /tmp/sscp-bats-tests/tuser/.hidden
-  touch /tmp/sscp-bats-tests/tuser/test1/some-file
-  touch /tmp/sscp-bats-tests/tuser/test1/.gitignore
+  touch /tmp/sscp-bats-tests/dir222/.gitignore
+  touch /tmp/sscp-bats-tests/dir222/.hidden
+  touch /tmp/sscp-bats-tests/dir222/test1/some-file
+  touch /tmp/sscp-bats-tests/dir222/test1/.gitignore
 
-  run sscp U /tmp/sscp-bats-tests/tuser /tmp/sscp-bats-tests/tuser-target/new-dir --host localhost --create-destination
+  run sscp U /tmp/sscp-bats-tests/dir222 /tmp/sscp-bats-tests/dir111/new-dir --host localhost --create-destination
 
   [ "${status}" -eq 0 ]
 
   expected=$(printf \
 "./test1/some-file
 ./.hidden")
-  result=$(cd /tmp/sscp-bats-tests/tuser-target/new-dir; find . -type f)
+  result=$(cd /tmp/sscp-bats-tests/dir111/new-dir; find . -type f)
 
   [[ "${expected}" == "${result}" ]]
 }
 
 @test "Test download with predefined paths." {
-  rm -rf /tmp/sscp-bats-tests/tuser-target \
-    /tmp/sscp-bats-tests/tuser \
+  rm -rf /tmp/sscp-bats-tests/dir111 \
+    /tmp/sscp-bats-tests/dir222 \
     /tmp/sscp-bats-tests/some
   mkdir -p /tmp/sscp-bats-tests/some
   cd /tmp/sscp-bats-tests/some
   cat <<- EOF > .sscprc
 connect='localhost'
 port=22
-remote_base_dir='/tmp/sscp-bats-tests/tuser'
-local_base_dir='/tmp/sscp-bats-tests/tuser-target'
+remote_base_dir='/tmp/sscp-bats-tests/dir222'
+local_base_dir='/tmp/sscp-bats-tests/dir111'
 EOF
 
-  mkdir -p /tmp/sscp-bats-tests/tuser
-  mkdir -p /tmp/sscp-bats-tests/tuser-target
+  mkdir -p /tmp/sscp-bats-tests/dir222
+  mkdir -p /tmp/sscp-bats-tests/dir111
 
-  touch /tmp/sscp-bats-tests/tuser/file1
+  touch /tmp/sscp-bats-tests/dir222/file1
 
   run sscp D file1 .
 
   [ "${status}" -eq 0 ]
 
   expected='./file1'
-  result=$(cd /tmp/sscp-bats-tests/tuser-target; find . -type f)
+  result=$(cd /tmp/sscp-bats-tests/dir111; find . -type f)
 
   [[ "${expected}" == "${result}" ]]
 }
 
 @test "Test upload with predefined paths." {
-  rm -rf /tmp/sscp-bats-tests/tuser-target \
-    /tmp/sscp-bats-tests/tuser \
+  rm -rf /tmp/sscp-bats-tests/dir111 \
+    /tmp/sscp-bats-tests/dir222 \
     /tmp/sscp-bats-tests/some
 
   # create not related directory and put .sscprc file in there
@@ -322,224 +322,224 @@ EOF
   cat <<- EOF > .sscprc
 connect='root@localhost'
 port=22
-remote_base_dir='/tmp/sscp-bats-tests/tuser-target'
-local_base_dir='/tmp/sscp-bats-tests/tuser'
+remote_base_dir='/tmp/sscp-bats-tests/dir111'
+local_base_dir='/tmp/sscp-bats-tests/dir222'
 EOF
 
-  mkdir -p /tmp/sscp-bats-tests/tuser
-  mkdir -p /tmp/sscp-bats-tests/tuser-target
+  mkdir -p /tmp/sscp-bats-tests/dir222
+  mkdir -p /tmp/sscp-bats-tests/dir111
 
-  touch /tmp/sscp-bats-tests/tuser/file1
+  touch /tmp/sscp-bats-tests/dir222/file1
 
   run /code/sscp upload file1 .
 
   [ "${status}" -eq 0 ]
 
   expected='./file1'
-  result=$(cd /tmp/sscp-bats-tests/tuser-target; find . -type f)
+  result=$(cd /tmp/sscp-bats-tests/dir111; find . -type f)
 
   [[ "${expected}" == "${result}" ]]
 }
 
 @test "Test upload with predefined remote path and relative local path in the command." {
-  rm -rf /tmp/sscp-bats-tests/tuser-target \
-    /tmp/sscp-bats-tests/tuser \
+  rm -rf /tmp/sscp-bats-tests/dir111 \
+    /tmp/sscp-bats-tests/dir222 \
     /tmp/sscp-bats-tests/some
 
-  mkdir -p /tmp/sscp-bats-tests/tuser
-  cd /tmp/sscp-bats-tests/tuser
+  mkdir -p /tmp/sscp-bats-tests/dir222
+  cd /tmp/sscp-bats-tests/dir222
 
   cat <<- EOF > .sscprc
 connect='root@localhost'
-remote_base_dir='/tmp/sscp-bats-tests/tuser-target'
+remote_base_dir='/tmp/sscp-bats-tests/dir111'
 EOF
 
-  mkdir -p /tmp/sscp-bats-tests/tuser
-  mkdir -p /tmp/sscp-bats-tests/tuser-target
+  mkdir -p /tmp/sscp-bats-tests/dir222
+  mkdir -p /tmp/sscp-bats-tests/dir111
 
-  touch /tmp/sscp-bats-tests/tuser/file1
+  touch /tmp/sscp-bats-tests/dir222/file1
 
   run /code/sscp upload file1
 
   [ "${status}" -eq 0 ]
 
   expected='./file1'
-  result=$(cd /tmp/sscp-bats-tests/tuser-target; find . -type f)
+  result=$(cd /tmp/sscp-bats-tests/dir111; find . -type f)
 
   [[ "${expected}" == "${result}" ]]
 }
 
 @test "Test download root predefined path without 'path' params." {
-  rm -rf /tmp/sscp-bats-tests/tuser-target \
-    /tmp/sscp-bats-tests/tuser \
+  rm -rf /tmp/sscp-bats-tests/dir111 \
+    /tmp/sscp-bats-tests/dir222 \
     /tmp/sscp-bats-tests/some
   mkdir -p /tmp/sscp-bats-tests/some
   cd /tmp/sscp-bats-tests/some
   cat <<- EOF > .sscprc
 connect='localhost'
 port=22
-remote_base_dir='/tmp/sscp-bats-tests/tuser'
-local_base_dir='/tmp/sscp-bats-tests/tuser-target'
+remote_base_dir='/tmp/sscp-bats-tests/dir222'
+local_base_dir='/tmp/sscp-bats-tests/dir111'
 EOF
 
-  mkdir -p /tmp/sscp-bats-tests/tuser
-  mkdir -p /tmp/sscp-bats-tests/tuser-target
+  mkdir -p /tmp/sscp-bats-tests/dir222
+  mkdir -p /tmp/sscp-bats-tests/dir111
 
-  touch /tmp/sscp-bats-tests/tuser/file1
+  touch /tmp/sscp-bats-tests/dir222/file1
 
   run sscp D
 
   [ "${status}" -eq 0 ]
 
   expected='./file1'
-  result=$(cd /tmp/sscp-bats-tests/tuser-target; find . -type f)
+  result=$(cd /tmp/sscp-bats-tests/dir111; find . -type f)
 
   [[ "${expected}" == "${result}" ]]
 }
 
 @test "Test upload root predefined path without 'path' params." {
-  rm -rf /tmp/sscp-bats-tests/tuser-target \
-    /tmp/sscp-bats-tests/tuser \
+  rm -rf /tmp/sscp-bats-tests/dir111 \
+    /tmp/sscp-bats-tests/dir222 \
     /tmp/sscp-bats-tests/some
   mkdir -p /tmp/sscp-bats-tests/some
   cd /tmp/sscp-bats-tests/some
   cat <<- EOF > .sscprc
 connect='root@localhost'
 port=22
-local_base_dir='/tmp/sscp-bats-tests/tuser'
-remote_base_dir='/tmp/sscp-bats-tests/tuser-target'
+local_base_dir='/tmp/sscp-bats-tests/dir222'
+remote_base_dir='/tmp/sscp-bats-tests/dir111'
 EOF
 
-  mkdir -p /tmp/sscp-bats-tests/tuser
-  mkdir -p /tmp/sscp-bats-tests/tuser-target
+  mkdir -p /tmp/sscp-bats-tests/dir222
+  mkdir -p /tmp/sscp-bats-tests/dir111
 
-  touch /tmp/sscp-bats-tests/tuser/file1
+  touch /tmp/sscp-bats-tests/dir222/file1
 
   run sscp U
 
   [ "${status}" -eq 0 ]
 
   expected='./file1'
-  result=$(cd /tmp/sscp-bats-tests/tuser-target; find . -type f)
+  result=$(cd /tmp/sscp-bats-tests/dir111; find . -type f)
 
   [[ "${expected}" == "${result}" ]]
 }
 
 @test "Test downloading archive into current directory without unpacking." {
-  rm -rf /tmp/sscp-bats-tests/tuser-target \
-    /tmp/sscp-bats-tests/tuser
+  rm -rf /tmp/sscp-bats-tests/dir111 \
+    /tmp/sscp-bats-tests/dir222
 
-  mkdir -p /tmp/sscp-bats-tests/tuser
-  mkdir -p /tmp/sscp-bats-tests/tuser-target
+  mkdir -p /tmp/sscp-bats-tests/dir222
+  mkdir -p /tmp/sscp-bats-tests/dir111
 
-  touch /tmp/sscp-bats-tests/tuser/file1
+  touch /tmp/sscp-bats-tests/dir222/file1
 
-  cd /tmp/sscp-bats-tests/tuser-target
-  run sscp D /tmp/sscp-bats-tests/tuser --host localhost
+  cd /tmp/sscp-bats-tests/dir111
+  run sscp D /tmp/sscp-bats-tests/dir222 --host localhost
 
   [ "${status}" -eq 0 ]
 
-  expected=$(printf "./tuser.tar.gz")
-  result=$(cd /tmp/sscp-bats-tests/tuser-target; find . -type f)
+  expected=$(printf "./dir222.tar.gz")
+  result=$(cd /tmp/sscp-bats-tests/dir111; find . -type f)
 
   [[ "${expected}" == "${result}" ]]
 }
 
 @test "Test upload manually created archive." {
-  rm -rf /tmp/sscp-bats-tests/tuser-target \
-    /tmp/sscp-bats-tests/tuser
+  rm -rf /tmp/sscp-bats-tests/dir111 \
+    /tmp/sscp-bats-tests/dir222
 
-  mkdir -p /tmp/sscp-bats-tests/tuser
-  mkdir -p /tmp/sscp-bats-tests/tuser-target
+  mkdir -p /tmp/sscp-bats-tests/dir222
+  mkdir -p /tmp/sscp-bats-tests/dir111
 
-  touch /tmp/sscp-bats-tests/tuser/file1
-  tar czf /tmp/sscp-bats-tests/ar.tar.gz -C /tmp/sscp-bats-tests/tuser .
+  touch /tmp/sscp-bats-tests/dir222/file1
+  tar czf /tmp/sscp-bats-tests/ar.tar.gz -C /tmp/sscp-bats-tests/dir222 .
 
-  run sscp U /tmp/sscp-bats-tests/ar.tar.gz /tmp/sscp-bats-tests/tuser-target --host root@localhost
+  run sscp U /tmp/sscp-bats-tests/ar.tar.gz /tmp/sscp-bats-tests/dir111 --host root@localhost
 
   [ "${status}" -eq 0 ]
 
   expected=$(printf "./ar.tar.gz")
-  result=$(cd /tmp/sscp-bats-tests/tuser-target; find . -type f)
+  result=$(cd /tmp/sscp-bats-tests/dir111; find . -type f)
 
   [[ "${expected}" == "${result}" ]]
 }
 
 @test "Test upload and unpack manually created archive." {
-  rm -rf /tmp/sscp-bats-tests/tuser-target \
-    /tmp/sscp-bats-tests/tuser
+  rm -rf /tmp/sscp-bats-tests/dir111 \
+    /tmp/sscp-bats-tests/dir222
 
-  mkdir -p /tmp/sscp-bats-tests/tuser
-  mkdir -p /tmp/sscp-bats-tests/tuser-target
+  mkdir -p /tmp/sscp-bats-tests/dir222
+  mkdir -p /tmp/sscp-bats-tests/dir111
 
-  touch /tmp/sscp-bats-tests/tuser/file1
-  tar czf /tmp/sscp-bats-tests/ar.tar.gz -C /tmp/sscp-bats-tests/tuser .
+  touch /tmp/sscp-bats-tests/dir222/file1
+  tar czf /tmp/sscp-bats-tests/ar.tar.gz -C /tmp/sscp-bats-tests/dir222 .
 
-  run sscp U /tmp/sscp-bats-tests/ar.tar.gz /tmp/sscp-bats-tests/tuser-target --host root@localhost --unpack
+  run sscp U /tmp/sscp-bats-tests/ar.tar.gz /tmp/sscp-bats-tests/dir111 --host root@localhost --unpack
 
   [ "${status}" -eq 0 ]
 
   expected=$(printf "./file1")
-  result=$(cd /tmp/sscp-bats-tests/tuser-target; find . -type f)
+  result=$(cd /tmp/sscp-bats-tests/dir111; find . -type f)
 
   [[ "${expected}" == "${result}" ]]
 }
 
 @test "Test download manually created archive." {
-  rm -rf /tmp/sscp-bats-tests/tuser-target \
-    /tmp/sscp-bats-tests/tuser
+  rm -rf /tmp/sscp-bats-tests/dir111 \
+    /tmp/sscp-bats-tests/dir222
 
-  mkdir -p /tmp/sscp-bats-tests/tuser
-  mkdir -p /tmp/sscp-bats-tests/tuser-target
+  mkdir -p /tmp/sscp-bats-tests/dir222
+  mkdir -p /tmp/sscp-bats-tests/dir111
 
-  touch /tmp/sscp-bats-tests/tuser/file1
-  tar czf /tmp/sscp-bats-tests/ar.tar.gz -C /tmp/sscp-bats-tests/tuser .
+  touch /tmp/sscp-bats-tests/dir222/file1
+  tar czf /tmp/sscp-bats-tests/ar.tar.gz -C /tmp/sscp-bats-tests/dir222 .
 
-  run sscp D /tmp/sscp-bats-tests/ar.tar.gz /tmp/sscp-bats-tests/tuser-target --host root@localhost
+  run sscp D /tmp/sscp-bats-tests/ar.tar.gz /tmp/sscp-bats-tests/dir111 --host root@localhost
 
   [ "${status}" -eq 0 ]
 
   expected=$(printf "./ar.tar.gz")
-  result=$(cd /tmp/sscp-bats-tests/tuser-target; find . -type f)
+  result=$(cd /tmp/sscp-bats-tests/dir111; find . -type f)
 
   [[ "${expected}" == "${result}" ]]
 }
 
 @test "Test download and unpack manually created archive." {
-  rm -rf /tmp/sscp-bats-tests/tuser-target \
-    /tmp/sscp-bats-tests/tuser
+  rm -rf /tmp/sscp-bats-tests/dir111 \
+    /tmp/sscp-bats-tests/dir222
 
-  mkdir -p /tmp/sscp-bats-tests/tuser
-  mkdir -p /tmp/sscp-bats-tests/tuser-target
+  mkdir -p /tmp/sscp-bats-tests/dir222
+  mkdir -p /tmp/sscp-bats-tests/dir111
 
-  touch /tmp/sscp-bats-tests/tuser/file1
-  tar czf /tmp/sscp-bats-tests/ar.tar.gz -C /tmp/sscp-bats-tests/tuser .
+  touch /tmp/sscp-bats-tests/dir222/file1
+  tar czf /tmp/sscp-bats-tests/ar.tar.gz -C /tmp/sscp-bats-tests/dir222 .
 
-  run sscp D /tmp/sscp-bats-tests/ar.tar.gz /tmp/sscp-bats-tests/tuser-target --host root@localhost --unpack
+  run sscp D /tmp/sscp-bats-tests/ar.tar.gz /tmp/sscp-bats-tests/dir111 --host root@localhost --unpack
 
   [ "${status}" -eq 0 ]
 
   expected=$(printf "./file1")
-  result=$(cd /tmp/sscp-bats-tests/tuser-target; find . -type f)
+  result=$(cd /tmp/sscp-bats-tests/dir111; find . -type f)
 
   [[ "${expected}" == "${result}" ]]
 }
 
 
 @test "Test downloading a directory by predefined paths." {
-  rm -rf /tmp/sscp-bats-tests/tuser-target \
-    /tmp/sscp-bats-tests/tuser
+  rm -rf /tmp/sscp-bats-tests/dir111 \
+    /tmp/sscp-bats-tests/dir222
 
-  mkdir -p /tmp/sscp-bats-tests/tuser/test1
-  mkdir -p /tmp/sscp-bats-tests/tuser-target
+  mkdir -p /tmp/sscp-bats-tests/dir222/test1
+  mkdir -p /tmp/sscp-bats-tests/dir111
 
-  touch /tmp/sscp-bats-tests/tuser/file1
-  touch /tmp/sscp-bats-tests/tuser/test1/file2
+  touch /tmp/sscp-bats-tests/dir222/file1
+  touch /tmp/sscp-bats-tests/dir222/test1/file2
 
-  cd /tmp/sscp-bats-tests/tuser-target
-  cat <<- EOF > /tmp/sscp-bats-tests/tuser-target/.sscprc
+  cd /tmp/sscp-bats-tests/dir111
+  cat <<- EOF > /tmp/sscp-bats-tests/dir111/.sscprc
 connect='localhost'
-remote_base_dir='/tmp/sscp-bats-tests/tuser'
+remote_base_dir='/tmp/sscp-bats-tests/dir222'
 local_base_dir='.'
 EOF
 
@@ -549,7 +549,7 @@ EOF
 
   expected=$(printf "./.sscprc
 ./test1/file2")
-  result=$(cd /tmp/sscp-bats-tests/tuser-target; find . -type f)
+  result=$(cd /tmp/sscp-bats-tests/dir111; find . -type f)
 
   [[ "${expected}" == "${result}" ]]
 }
