@@ -581,3 +581,12 @@ EOF
 
   [[ "${expected}" == "${result}" ]]
 }
+
+@test "Test getting version." {
+  run sscp --version
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == "0.12.0" ]]
+
+  run sscp -V
+  [[ "${output}" == "0.12.0" ]]
+}

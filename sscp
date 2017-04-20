@@ -23,8 +23,10 @@ VERBOSE_OFF=0
 VERBOSE=1
 VERBOSE_VERY=2
 VERBOSE_DEBUG=3
+APP_VERSION=0.12.0
 readonly ERR_FATAL ERR_LOGIC ERR_PARAMS ERR_FILE_SYSTEM \
-          VERBOSE VERBOSE_VERY VERBOSE_OFF VERBOSE_DEBUG
+          VERBOSE VERBOSE_VERY VERBOSE_OFF VERBOSE_DEBUG APP_VERSION
+
 
 SSCP_RC=${SSCP_RC:-.sscprc}
 # directory where base .sscprc file
@@ -74,7 +76,7 @@ t_OK=${t_green}'OK'${t_reset}
 
 show_help () {
     cat << EOF
-SSCP Shell Tool v0.12.0
+SSCP Shell Tool v${APP_VERSION}
 Fast downloader/deployer for remote servers.
 It archives files by using tar and transports them using by SCP. So, just pack and transfer.
 All commands run by using SSH connection.
@@ -154,6 +156,8 @@ OPTIONS FOR FILE TRANSFERRING
   -x|--tar-exclude
               Add exclude path on pack files.
   -u|--unpack Unpack downloaded archive automatically in case when archive was created before transferring.
+  -V|--version
+              Show version number
   -h|--help   Show this help
 
 CONNECTION PARAMETERS
@@ -276,6 +280,7 @@ read_params () {
     [D]=debug
     [u]=unpack
     [x:]=tar-exclude:
+    [V]=version
   )
   OPTS=`getopt -o $(echo ${!options[*]} | tr -d ' ') -l $(echo ${options[*]} | tr ' ' ',') -- "$@"`
   eval set -- "${OPTS}"
@@ -324,6 +329,11 @@ read_params () {
       -x|--tar-exclude)
         tar_pack_options+=" --exclude=$2 "
         shift 2
+        ;;
+      -V|--version)
+        # just show version number
+        echo ${APP_VERSION}
+        exit 0
         ;;
       -h|--help)
         show_help
