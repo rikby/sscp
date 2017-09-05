@@ -560,6 +560,8 @@ download_target() {
   fi
   source_basename=$(basename "${source_path}")
   readonly source_path source_basename
+  put_echo ${VERBOSE_DEBUG} 'source_path = '${source_path}
+  put_echo ${VERBOSE_DEBUG} 'source_basename = '${source_basename}
 
   #####
   # Determine target path path
@@ -582,6 +584,7 @@ download_target() {
     check_error ${ERR_LOGIC} "Cannot determine target path."
   fi
   readonly target_path
+  put_echo ${VERBOSE_DEBUG} 'target_path = '${target_path}
 
   # show paths
   put_printf "local:${t_green}${target_path}${t_reset} <= remote:${t_green}${source_path}${t_reset}\n"
@@ -594,6 +597,7 @@ download_target() {
   else
     check_error ${ERR_FILE_SYSTEM} "Path '${source_path}' does not exist."
   fi
+  put_echo ${VERBOSE_DEBUG} 'source_type = '${source_type}
 
   if [ ${source_type} == 'f' ]; then
     target_to_archive=${source_basename}
@@ -602,20 +606,24 @@ download_target() {
       target_to_archive=''
     fi
     source_dir=$(dirname "${source_path}")
+    target_dir=$(dirname "${target_path}")
   else
     source_dir=${source_path}
     target_to_archive='.'
+    target_dir=${target_path}
   fi
+
+  put_echo ${VERBOSE_DEBUG} 'target_dir = '${target_dir}
 
   # validate params
   ${ssh_connect} "ls -la ${source_path} > /dev/null 2>&1"
   check_error $? "Path '${source_path}' does not exist."
 
-  if [ 0 == ${create_target_path} ] && [ 0 == $(ls -la ${target_path} > /dev/null 2>&1 && echo 1 || echo 0) ]; then
-    check_error ${ERR_FILE_SYSTEM} "Local target directory ${target_path} does not exist."
+  if [ 0 == ${create_target_path} ] && [ 0 == $(ls -la ${target_dir} > /dev/null 2>&1 && echo 1 || echo 0) ]; then
+    check_error ${ERR_FILE_SYSTEM} "Local target directory ${target_dir} does not exist."
   fi
-  if [ 1 == ${create_target_path} ] && [ 0 == $(mkdir ${target_path} -p > /dev/null 2>&1 && echo 1 || echo 0) ]; then
-    check_error ${ERR_FILE_SYSTEM} "Could not create local target directory '${target_path}'."
+  if [ 1 == ${create_target_path} ] && [ 0 == $(mkdir ${target_dir} -p > /dev/null 2>&1 && echo 1 || echo 0) ]; then
+    check_error ${ERR_FILE_SYSTEM} "Could not create local target directory '${target_dir}'."
   fi
 
   if [ -n "${target_to_archive}" ]; then
@@ -646,7 +654,7 @@ download_target() {
   if [ -n "${target_path}" ] && [ -n "${target_to_archive}" ] || [ ${unpack_automatically} == 1 ]; then
     # Unpack downloaded archive
     put_printf "Unpacking archive..."
-    tar xf $(tmp_dir)/${transfer_filename} -C ${target_path:-.}
+    tar xf $(tmp_dir)/${transfer_filename} -C ${target_dir:-.}
     put_echo "${t_OK}"
     rm -f $(tmp_dir)/${transfer_filename}
   elif [ -z "${target_path}" ] && [ -n "${target_to_archive}" ] && [ ${unpack_automatically} == 0 ]; then
