@@ -585,8 +585,8 @@ EOF
 @test "Test getting version." {
   run sscp --version
   [ "${status}" -eq 0 ]
-  [[ "${output}" == "0.12.0" ]]
+  [[ "${output}" == "0.12.1" ]]
 
   run sscp -V
-  [[ "${output}" == "0.12.0" ]]
+  [[ "${output}" == "0.12.1" ]]
 }
