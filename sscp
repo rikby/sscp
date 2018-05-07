@@ -506,10 +506,10 @@ deploy_target() {
 
     if [ ${source_type} = 'd' ]; then
       put_echo ${VERBOSE_VERY} 'Deploy directory mode.'
-      tar czf ${source_archive_deploy} -C ${source_dir} . ${exclude} ${tar_pack_options} ${rest_options}
+      tar czf ${source_archive_deploy} -C ${source_dir} ${exclude} ${tar_pack_options} ${rest_options} .
     else
       put_echo ${VERBOSE_VERY} 'Deploy single file mode.'
-      tar czf ${source_archive_deploy} -C ${source_dir} $(basename ${source_path}) ${exclude} ${tar_pack_options} ${rest_options}
+      tar czf ${source_archive_deploy} -C ${source_dir} ${exclude} ${tar_pack_options} ${rest_options} $(basename ${source_path})
     fi
     put_echo "${t_OK}"
     archive_created=1
